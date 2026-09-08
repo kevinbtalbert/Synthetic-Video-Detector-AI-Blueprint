@@ -10,6 +10,7 @@ entries:
       (build the repository root Dockerfile with NGC login for nvcr.io, then register).
       Bundled mode embeds the Synthetic Video Detector NIM in a single runtime image.
       Serverless mode uses the NVIDIA Cloud Functions gRPC API (no local GPU required).
+    image_path: "https://raw.githubusercontent.com/kevinbtalbert/Synthetic-Video-Detector-AI-Blueprint/refs/heads/main/assets/synthetic-video-detector.jpg"
     tags:
       - Synthetic Video Detection
       - NVIDIA NIM
