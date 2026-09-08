@@ -1,0 +1,45 @@
+# Python
+.venv/
+.venv-nim/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+client/demos/dist/
+client/demos/.next/
+
+# Secrets and local config
+.env
+.env.local
+.cml-local.env
+cai/config/deployment_config.json
+cai/config/app_environment.env
+cai/config/runtime_endpoints.env
+cai/config/build_progress.json
+cai/config/build.lock
+cai/config/*_nim.env
+cai/config/*_sidecar.log
+cai/config/*_nim.log
+cai/nim_endpoints.json
+
+# Model caches (large)
+volumes/models/synthetic-video-detector/*
+!volumes/models/synthetic-video-detector/.gitkeep
+build/nim-model-cache/synthetic-video-detector/*
+!build/nim-model-cache/synthetic-video-detector/.gitkeep
+!build/nim-model-cache/README.md
+
+# Outputs
+outputs/
+media/
+uploads/
+
+# IDE
+.idea/
+.vscode/
+*.swp

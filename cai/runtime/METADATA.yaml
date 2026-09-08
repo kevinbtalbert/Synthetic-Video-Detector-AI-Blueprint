@@ -1,0 +1,16 @@
+name: "Synthetic Video Detector"
+slug: "synthetic-video-detector"
+launchable: true
+lifecycle_status: Active
+
+amp_runtime_match:
+  editor: JupyterLab
+  kernel: Python 3.13
+  edition: SyntheticVideoDetector
+  version: "1.0.0"
+
+docker_image_example: "docker.io/<your-user>/synthetic-video-detector:1.0.0-turing"
+
+description: |
+  Single Docker image for NVIDIA Synthetic Video Detector on Cloudera AI Workbench.
+  SVD NIM server bundled at image build time. Supports bundled GPU and serverless NVCF modes.

@@ -1,0 +1,31 @@
+[project]
+name = "synthetic-video-detector"
+version = "1.0.0"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = [
+    "grpcio==1.67.1",
+    "grpcio-tools==1.67.1",
+    "grpcio-health-checking==1.67.1",
+    "protobuf==5.29.6",
+    "python-dotenv==1.2.2",
+    "requests==2.33.1",
+    "packaging==26.0",
+    "urllib3==2.7.0",
+    "cryptography==49.0.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+lint = ["ruff>=0.9"]
+
+[project.scripts]
+svd-detect = "src.svd.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

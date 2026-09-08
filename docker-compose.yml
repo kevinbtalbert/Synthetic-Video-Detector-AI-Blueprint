@@ -1,0 +1,40 @@
+# Single-container Synthetic Video Detector stack (local dev).
+# Requires: NVIDIA Container Toolkit, Docker socket (bundled mode), 1 GPU (T4/L4/A10 class).
+
+services:
+  synthetic-video-detector:
+    container_name: synthetic-video-detector
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${IMAGE:-synthetic-video-detector:latest}
+    runtime: nvidia
+    shm_size: 8gb
+    ports:
+      - "${APP_PORT:-3000}:${APP_PORT:-3000}"
+      - "${NIM_HTTP_API_PORT:-8000}:${NIM_HTTP_API_PORT:-8000}"
+      - "${NIM_GRPC_API_PORT:-8001}:${NIM_GRPC_API_PORT:-8001}"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NGC_API_KEY=${NGC_API_KEY}
+      - NIM_DEPLOY_MODE=${NIM_DEPLOY_MODE:-BUNDLED}
+      - SVD_NVIDIA_FUNCTION_ID=${SVD_NVIDIA_FUNCTION_ID:-847b6e53-0133-452d-ab85-d7acf3ace723}
+      - NVIDIA_SERVERLESS_GRPC_HOST=${NVIDIA_SERVERLESS_GRPC_HOST:-grpc.nvcf.nvidia.com}
+      - NVIDIA_SERVERLESS_GRPC_PORT=${NVIDIA_SERVERLESS_GRPC_PORT:-443}
+      - APP_PORT=${APP_PORT:-3000}
+      - START_NIM=${START_NIM:-1}
+      - SVD_NIM_IMAGE=${SVD_NIM_IMAGE:-nvcr.io/nim/nvidia/synthetic-video-detector:latest}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./volumes/models/synthetic-video-detector:/var/lib/synthetic-video-detector/models
+      - ./assets:/opt/synthetic-video-detector/assets:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:${APP_PORT:-3000}/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+
+networks:
+  default:
+    name: synthetic-video-detector-network

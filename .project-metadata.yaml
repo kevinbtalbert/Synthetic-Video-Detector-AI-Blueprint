@@ -1,0 +1,47 @@
+name: Synthetic Video Detector
+description: |
+  Deploy NVIDIA Synthetic Video Detector on Cloudera AI Workbench. AMP installs
+  dependencies and starts the Launchpad web UI. Configure NGC API key and
+  deployment mode (bundled NIM or serverless NVCF) in the app.
+author: Cloudera
+specification_version: 1.0
+prototype_version: 1.0
+date: "2026-09-08"
+shared_memory_limit: 8
+
+runtimes:
+  - editor: JupyterLab
+    kernel: Python 3.13
+    edition: SyntheticVideoDetector
+    version: "1.0.0"
+
+tasks:
+  - type: run_session
+    name: Install Python Dependencies
+    script: cai/amp/1_install/install_dependencies.py
+    short_summary: Install blueprint Python deps and generate protobuf code
+    kernel: python3
+    cpu: 4
+    memory: 8
+
+  - type: run_session
+    name: Build Web UI
+    script: cai/amp/6_demo_ui/build_demo.py
+    short_summary: Build Next.js UI (skipped when runtime image already includes dist/)
+    kernel: python3
+    cpu: 4
+    memory: 8
+
+  - type: start_application
+    name: Synthetic Video Detector Launchpad
+    subdomain: synthetic-video-detector-ui
+    script: cai/amp/6_demo_ui/start_demo.py
+    short_summary: Start Launchpad — configure and build the detection pipeline
+    long_summary: |
+      Start the Synthetic Video Detector Launchpad. Configure NGC API key and
+      deployment mode, then build the pipeline from the UI. Enable unauthenticated
+      app access for external URLs.
+    cpu: 2
+    memory: 8
+    environment:
+      TASK_TYPE: START_APPLICATION
