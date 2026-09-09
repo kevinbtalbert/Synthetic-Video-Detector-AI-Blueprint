@@ -14,32 +14,29 @@ sys.path.insert(0, str(Path(os.environ.get("CDSW_PROJECT_DIR", "/home/cdsw"))))
 from cai.lib.amp_runtime import run_amp_entry  # noqa: E402
 from cai.lib.app_config import apply_persisted_config  # noqa: E402
 from cai.lib.cai_common import apply_dotenv_to_os  # noqa: E402
-from cai.lib.paths import ENDPOINTS_ENV, PROJECT_ROOT, ensure_cai_dirs  # noqa: E402
-from cai.lib.runtime_env import capture_runtime_context  # noqa: E402
+from cai.lib.demo_ui import DEMO_DIR, SERVER_JS, ensure_demo_ui, missing_demo_ui_message  # noqa: E402
+from cai.lib.paths import ENDPOINTS_ENV, ensure_cai_dirs  # noqa: E402
+from cai.lib.runtime_env import log_runtime_context  # noqa: E402
 from cai.lib.service_env import load_config_defaults  # noqa: E402
-
-DEMO_DIR = PROJECT_ROOT / "client" / "demos"
-SERVER_JS = DEMO_DIR / "dist" / "server.js"
 
 
 def main() -> int:
-    load_config_defaults()
-    apply_persisted_config()
-    if ENDPOINTS_ENV.exists():
-        apply_dotenv_to_os(ENDPOINTS_ENV)
-    capture_runtime_context()
-    ensure_cai_dirs()
+    try:
+        log_runtime_context()
+        load_config_defaults()
+        apply_persisted_config()
+        if ENDPOINTS_ENV.exists():
+            apply_dotenv_to_os(ENDPOINTS_ENV)
+        ensure_cai_dirs()
+    except Exception as exc:
+        print(f"WARNING: startup configuration step failed: {exc}", flush=True)
 
     port = os.environ.get("CDSW_APP_PORT") or os.environ.get("PORT") or "8080"
     os.environ["PORT"] = str(port)
     os.environ.setdefault("NODE_ENV", "production")
 
-    if not SERVER_JS.is_file():
-        print(
-            f"ERROR: Web UI not built — missing {SERVER_JS}\n"
-            "Run the AMP step 'Build Web UI' or set FORCE_DEMO_BUILD=1 and rebuild.",
-            flush=True,
-        )
+    if not ensure_demo_ui():
+        print(missing_demo_ui_message(), flush=True)
         return 1
 
     node = which("node") or "/usr/bin/node"

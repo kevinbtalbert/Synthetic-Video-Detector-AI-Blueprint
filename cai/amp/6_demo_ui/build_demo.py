@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -13,44 +12,18 @@ from shutil import which
 sys.path.insert(0, str(Path(os.environ.get("CDSW_PROJECT_DIR", "/home/cdsw"))))
 
 from cai.lib.amp_runtime import run_amp_entry  # noqa: E402
-from cai.lib.paths import PROJECT_ROOT  # noqa: E402
-
-DEMO_DIR = PROJECT_ROOT / "client" / "demos"
-SERVER_JS = DEMO_DIR / "dist" / "server.js"
-RUNTIME_DEMO_DIR = Path(os.environ.get("APP_ROOT", "/opt/synthetic-video-detector")) / "client" / "demos"
-RUNTIME_SERVER_JS = RUNTIME_DEMO_DIR / "dist" / "server.js"
-
-
-def _copy_runtime_build() -> bool:
-    """Use pre-built UI from the custom runtime image when the git checkout has no dist/."""
-    if not RUNTIME_SERVER_JS.is_file():
-        return False
-    print(f"Copying pre-built Web UI from runtime image ({RUNTIME_SERVER_JS})")
-    for name in ("dist", ".next"):
-        src = RUNTIME_DEMO_DIR / name
-        dst = DEMO_DIR / name
-        if not src.is_dir():
-            continue
-        if dst.exists():
-            shutil.rmtree(dst)
-        shutil.copytree(src, dst)
-    return SERVER_JS.is_file()
+from cai.lib.demo_ui import DEMO_DIR, SERVER_JS, copy_runtime_demo_ui, demo_ui_ready  # noqa: E402
 
 
 def main() -> int:
     os.chdir(DEMO_DIR)
-    next_dir = DEMO_DIR / ".next"
 
-    if (
-        SERVER_JS.is_file()
-        and next_dir.is_dir()
-        and not os.environ.get("FORCE_DEMO_BUILD", "").strip()
-    ):
+    if demo_ui_ready() and not os.environ.get("FORCE_DEMO_BUILD", "").strip():
         print(f"Web UI already built ({SERVER_JS}) — skipping npm build")
         print("Set FORCE_DEMO_BUILD=1 to rebuild after code changes.")
         return 0
 
-    if _copy_runtime_build() and not os.environ.get("FORCE_DEMO_BUILD", "").strip():
+    if copy_runtime_demo_ui() and not os.environ.get("FORCE_DEMO_BUILD", "").strip():
         print(f"Web UI ready from runtime image ({SERVER_JS})")
         return 0
 
