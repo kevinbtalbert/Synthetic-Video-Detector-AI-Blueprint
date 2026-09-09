@@ -5,7 +5,7 @@ import os from "os";
 import path from "path";
 import { applyPersistedConfigToProcessEnv, pythonPath, projectRoot } from "../utils/persistedConfig";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   applyPersistedConfigToProcessEnv();
   const form = await request.formData();
   const file = form.get("video");
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   const root = projectRoot();
   const env = { ...process.env, PYTHONPATH: [root, path.join(root, "src")].join(":") };
 
-  return new Promise((resolve) => {
+  return new Promise<NextResponse>((resolve) => {
     const proc = spawn(
       pythonPath(),
       ["-m", "src.svd.cli", "--video-input", videoPath, "--output-json", jsonPath],

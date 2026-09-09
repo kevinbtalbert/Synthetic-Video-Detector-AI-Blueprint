@@ -4,8 +4,8 @@ import fs from "fs";
 import path from "path";
 import { controlPlaneScript, pythonPath } from "../utils/persistedConfig";
 
-export async function GET() {
-  return new Promise((resolve) => {
+export async function GET(): Promise<NextResponse> {
+  return new Promise<NextResponse>((resolve) => {
     const proc = spawn(pythonPath(), [controlPlaneScript(), "status"]);
     let stdout = "";
     let stderr = "";
@@ -21,9 +21,14 @@ export async function GET() {
   });
 }
 
-export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const action = body.action as string;
+type DeploymentRequestBody = {
+  action?: string;
+  config?: Record<string, unknown>;
+};
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const body = (await request.json()) as DeploymentRequestBody;
+  const action = body.action ?? "";
   const config = body.config;
 
   if (action === "save-config") {

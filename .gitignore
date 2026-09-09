@@ -33,6 +33,15 @@ volumes/models/synthetic-video-detector/*
 build/nim-model-cache/synthetic-video-detector/*
 !build/nim-model-cache/synthetic-video-detector/.gitkeep
 !build/nim-model-cache/README.md
+# EC2 remote Docker build/push (local operator tooling — do not commit)
+scripts/aws/
+build/.ec2-secrets.env
+build/.ec2-build-remote.sh
+build/svd-build.pem
+build/ec2-builder.env
+build/ec2-build-status
+build/ec2-launch.log
+build/ec2-monitor.log
 
 # Outputs
 outputs/

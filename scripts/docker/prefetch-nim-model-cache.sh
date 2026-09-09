@@ -15,10 +15,11 @@ mkdir -p "${cache}"
 echo "Prefetching SVD models into ${cache} ..."
 
 docker run --rm --gpus all \
+  --entrypoint bash \
   -e NGC_API_KEY="${NGC_API_KEY}" \
   -v "${cache}:/opt/nim/.cache" \
   "${image}" \
-  bash -lc 'test -d /opt/nim/.cache && ls -la /opt/nim/.cache | head -20'
+  -lc 'test -d /opt/nim/.cache && ls -la /opt/nim/.cache | head -20'
 
 if [[ -z "$(ls -A "${cache}" 2>/dev/null || true)" ]]; then
   echo "WARNING: cache directory is empty — first runtime start will download models." >&2

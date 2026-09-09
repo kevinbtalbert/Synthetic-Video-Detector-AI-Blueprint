@@ -7,15 +7,19 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from shutil import which
 
 sys.path.insert(0, str(Path(os.environ.get("CDSW_PROJECT_DIR", "/home/cdsw"))))
 
 from cai.lib.amp_runtime import run_amp_entry  # noqa: E402
 from cai.lib.app_config import apply_persisted_config  # noqa: E402
 from cai.lib.cai_common import apply_dotenv_to_os  # noqa: E402
-from cai.lib.paths import CONFIG_DIR, ENDPOINTS_ENV, PROJECT_ROOT  # noqa: E402
+from cai.lib.paths import ENDPOINTS_ENV, PROJECT_ROOT, ensure_cai_dirs  # noqa: E402
 from cai.lib.runtime_env import capture_runtime_context  # noqa: E402
 from cai.lib.service_env import load_config_defaults  # noqa: E402
+
+DEMO_DIR = PROJECT_ROOT / "client" / "demos"
+SERVER_JS = DEMO_DIR / "dist" / "server.js"
 
 
 def main() -> int:
@@ -24,13 +28,28 @@ def main() -> int:
     if ENDPOINTS_ENV.exists():
         apply_dotenv_to_os(ENDPOINTS_ENV)
     capture_runtime_context()
+    ensure_cai_dirs()
 
-    demo = PROJECT_ROOT / "client" / "demos"
-    port = os.environ.get("CDSW_APP_PORT", "3000")
-    env = {**os.environ, "PORT": port, "CDSW_APP_PORT": port}
-    if (demo / "dist").is_dir():
-        return subprocess.call(["npm", "run", "start"], cwd=demo, env=env)
-    return subprocess.call(["npm", "run", "dev"], cwd=demo, env=env)
+    port = os.environ.get("CDSW_APP_PORT") or os.environ.get("PORT") or "8080"
+    os.environ["PORT"] = str(port)
+    os.environ.setdefault("NODE_ENV", "production")
+
+    if not SERVER_JS.is_file():
+        print(
+            f"ERROR: Web UI not built — missing {SERVER_JS}\n"
+            "Run the AMP step 'Build Web UI' or set FORCE_DEMO_BUILD=1 and rebuild.",
+            flush=True,
+        )
+        return 1
+
+    node = which("node") or "/usr/bin/node"
+    if not Path(node).is_file():
+        print(f"ERROR: node not found (tried {node})", flush=True)
+        return 1
+
+    os.chdir(DEMO_DIR)
+    print(f"Starting Launchpad UI: {node} {SERVER_JS} on 127.0.0.1:{port}", flush=True)
+    return subprocess.call([node, str(SERVER_JS)])
 
 
 run_amp_entry(main, __name__)
