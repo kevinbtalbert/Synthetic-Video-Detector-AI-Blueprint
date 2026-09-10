@@ -58,8 +58,33 @@ def _expit(logit: float) -> float:
     return exp_logit / (1.0 + exp_logit)
 
 
+def _local_endpoint(endpoint: str) -> bool:
+    host = endpoint.partition(":")[0].strip().lower()
+    return host in {"127.0.0.1", "localhost", "0.0.0.0"}
+
+
 def resolve_svd_target() -> tuple[str, bool, tuple[tuple[str, str], ...] | None]:
     """Return (host:port, use_tls, nvcf_metadata)."""
+    mode = os.environ.get("NIM_DEPLOY_MODE", "BUNDLED").strip().upper()
+
+    if mode == "SERVERLESS":
+        endpoint = os.environ.get("SVD_SERVER", "").strip()
+        if endpoint and not _local_endpoint(endpoint):
+            host, _, port = endpoint.partition(":")
+            port = port or DEFAULT_NVCF_GRPC_PORT
+            target = f"{host}:{port}"
+            if is_nvcf_endpoint(host):
+                api_key = os.environ.get("NGC_API_KEY", "").strip()
+                if not api_key:
+                    raise RuntimeError("NGC_API_KEY is required for serverless NVCF mode")
+                return target, True, nvcf_grpc_metadata(api_key, svd_nvcf_function_id())
+        host = os.environ.get("NVIDIA_SERVERLESS_GRPC_HOST", DEFAULT_NVCF_GRPC_HOST)
+        port = os.environ.get("NVIDIA_SERVERLESS_GRPC_PORT", DEFAULT_NVCF_GRPC_PORT)
+        api_key = os.environ.get("NGC_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError("NGC API key is required for serverless mode — configure it in the Launchpad UI")
+        return f"{host}:{port}", True, nvcf_grpc_metadata(api_key, svd_nvcf_function_id())
+
     endpoint = os.environ.get("SVD_SERVER", "").strip()
     if endpoint:
         host, _, port = endpoint.partition(":")
@@ -72,16 +97,10 @@ def resolve_svd_target() -> tuple[str, bool, tuple[tuple[str, str], ...] | None]
             return target, True, nvcf_grpc_metadata(api_key, svd_nvcf_function_id())
         return target, False, None
 
-    mode = os.environ.get("NIM_DEPLOY_MODE", "BUNDLED").strip().upper()
-    if mode == "SERVERLESS":
-        host = os.environ.get("NVIDIA_SERVERLESS_GRPC_HOST", DEFAULT_NVCF_GRPC_HOST)
-        port = os.environ.get("NVIDIA_SERVERLESS_GRPC_PORT", DEFAULT_NVCF_GRPC_PORT)
-        api_key = os.environ.get("NGC_API_KEY", "").strip()
-        if not api_key:
-            raise RuntimeError("NGC_API_KEY is required for serverless mode")
-        return f"{host}:{port}", True, nvcf_grpc_metadata(api_key, svd_nvcf_function_id())
-
-    return "127.0.0.1:8001", False, None
+    raise RuntimeError(
+        "Bundled NIM endpoint is not configured. Build the pipeline from Configure, "
+        "or switch to SERVERLESS mode."
+    )
 
 
 def _video_chunks(video_path: Path) -> Iterator[syntheticvideodetector_pb2.DetectSyntheticVideoRequest]:

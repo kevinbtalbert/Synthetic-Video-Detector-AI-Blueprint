@@ -3,7 +3,12 @@ import { spawn } from "child_process";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
-import { applyPersistedConfigToProcessEnv, pythonPath, projectRoot } from "../utils/persistedConfig";
+import {
+  buildDetectProcessEnv,
+  pythonPath,
+  projectRoot,
+  validateDetectEnv,
+} from "../utils/persistedConfig";
 
 type DetectPayload = {
   probability: number;
@@ -15,7 +20,12 @@ type DetectPayload = {
 };
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  applyPersistedConfigToProcessEnv();
+  const detectEnv = buildDetectProcessEnv();
+  const configError = validateDetectEnv(detectEnv);
+  if (configError) {
+    return NextResponse.json({ error: configError }, { status: 400 });
+  }
+
   const stream = request.nextUrl.searchParams.get("stream") === "1";
   const form = await request.formData();
   const file = form.get("video");
@@ -30,7 +40,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   await fs.writeFile(videoPath, buffer);
 
   const root = projectRoot();
-  const env = { ...process.env, PYTHONPATH: [root, path.join(root, "src")].join(":") };
+  const env = {
+    ...detectEnv,
+    PYTHONPATH: [root, path.join(root, "src")].join(":"),
+  };
   const cliArgs = [
     "-m",
     "src.svd.cli",

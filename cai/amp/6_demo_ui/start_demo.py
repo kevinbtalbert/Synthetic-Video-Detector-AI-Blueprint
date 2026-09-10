@@ -24,9 +24,9 @@ def main() -> int:
     try:
         log_runtime_context()
         load_config_defaults()
-        apply_persisted_config()
         if ENDPOINTS_ENV.exists():
             apply_dotenv_to_os(ENDPOINTS_ENV)
+        apply_persisted_config()
         ensure_cai_dirs()
     except Exception as exc:
         print(f"WARNING: startup configuration step failed: {exc}", flush=True)

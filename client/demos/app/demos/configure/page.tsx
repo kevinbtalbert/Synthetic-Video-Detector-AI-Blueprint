@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Header from "@/app/components/atoms/Header";
 import Card from "@/app/components/atoms/Card";
@@ -23,22 +23,30 @@ export default function ConfigurePage() {
     pollWhilePending: true,
   });
   const [form, setForm] = useState(defaultForm);
+  const [formDirty, setFormDirty] = useState(false);
+  const formHydrated = useRef(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const patchForm = (patch: Partial<typeof defaultForm>) => {
+    setFormDirty(true);
+    setForm((prev) => ({ ...prev, ...patch }));
+  };
+
+  // Load saved config once; do not overwrite while the user is editing (build polling refreshes status).
   useEffect(() => {
-    if (status?.config) {
-      setForm((prev) => ({
-        ...prev,
-        nim_deploy_mode: (status.config!.nim_deploy_mode as Mode) || prev.nim_deploy_mode,
-        svd_nvidia_function_id: String(status.config!.svd_nvidia_function_id || prev.svd_nvidia_function_id),
-        nvidia_serverless_grpc_host: String(status.config!.nvidia_serverless_grpc_host || prev.nvidia_serverless_grpc_host),
-        nvidia_serverless_grpc_port: String(status.config!.nvidia_serverless_grpc_port || prev.nvidia_serverless_grpc_port),
-        detection_threshold: String(status.config!.detection_threshold || prev.detection_threshold),
-      }));
-    }
-  }, [status]);
+    if (!status?.config || formDirty || formHydrated.current) return;
+    formHydrated.current = true;
+    setForm((prev) => ({
+      ...prev,
+      nim_deploy_mode: (status.config!.nim_deploy_mode as Mode) || prev.nim_deploy_mode,
+      svd_nvidia_function_id: String(status.config!.svd_nvidia_function_id || prev.svd_nvidia_function_id),
+      nvidia_serverless_grpc_host: String(status.config!.nvidia_serverless_grpc_host || prev.nvidia_serverless_grpc_host),
+      nvidia_serverless_grpc_port: String(status.config!.nvidia_serverless_grpc_port || prev.nvidia_serverless_grpc_port),
+      detection_threshold: String(status.config!.detection_threshold || prev.detection_threshold),
+    }));
+  }, [status, formDirty]);
 
   const post = async (action: string) => {
     setBusy(true);
@@ -54,9 +62,12 @@ export default function ConfigurePage() {
       if (!res.ok) throw new Error(data.error || JSON.stringify(data.errors || data));
       if (action === "build") {
         setMessage("Build started — polling status…");
+        setFormDirty(false);
         void refresh();
       } else if (action === "save-config") {
         setMessage("Configuration saved.");
+        setFormDirty(false);
+        formHydrated.current = true;
       } else {
         setMessage(data.valid ? "Validation passed." : data.errors?.join("; "));
       }
@@ -79,7 +90,7 @@ export default function ConfigurePage() {
                 <input
                   type="radio"
                   checked={form.nim_deploy_mode === mode}
-                  onChange={() => setForm({ ...form, nim_deploy_mode: mode })}
+                  onChange={() => patchForm({ nim_deploy_mode: mode })}
                 />
                 {mode === "BUNDLED" ? "Bundled NIM (GPU)" : "Serverless NVCF API"}
               </label>
@@ -88,7 +99,7 @@ export default function ConfigurePage() {
           <SecretInput
             label="NGC API Key"
             value={form.ngc_api_key}
-            onChange={(v) => setForm({ ...form, ngc_api_key: v })}
+            onChange={(v) => patchForm({ ngc_api_key: v })}
             placeholder={status?.secrets_set?.ngc_api_key ? "•••••••• (saved)" : "nvapi-…"}
           />
           {form.nim_deploy_mode === "SERVERLESS" && (
@@ -98,7 +109,7 @@ export default function ConfigurePage() {
                 <input
                   className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2"
                   value={form.svd_nvidia_function_id}
-                  onChange={(e) => setForm({ ...form, svd_nvidia_function_id: e.target.value })}
+                  onChange={(e) => patchForm({ svd_nvidia_function_id: e.target.value })}
                 />
               </label>
               <label className="text-sm">
@@ -106,7 +117,7 @@ export default function ConfigurePage() {
                 <input
                   className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2"
                   value={form.nvidia_serverless_grpc_host}
-                  onChange={(e) => setForm({ ...form, nvidia_serverless_grpc_host: e.target.value })}
+                  onChange={(e) => patchForm({ nvidia_serverless_grpc_host: e.target.value })}
                 />
               </label>
             </div>

@@ -33,6 +33,73 @@ export function endpointsEnvPath(): string {
   return path.join(projectRoot(), "cai/config/runtime_endpoints.env");
 }
 
+export function appEnvironmentPath(): string {
+  return path.join(projectRoot(), "cai/config/app_environment.env");
+}
+
+function applyDotenvFile(targetPath: string, env: NodeJS.ProcessEnv): void {
+  if (!fs.existsSync(targetPath)) return;
+  for (const line of fs.readFileSync(targetPath, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+    const eq = trimmed.indexOf("=");
+    const key = trimmed.slice(0, eq);
+    let val = trimmed.slice(eq + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    env[key] = val;
+  }
+}
+
+function applyDeploymentJson(env: NodeJS.ProcessEnv): void {
+  const configPath = deploymentConfigPath();
+  if (!fs.existsSync(configPath)) return;
+  try {
+    const data = JSON.parse(fs.readFileSync(configPath, "utf8")) as PersistedConfig;
+    for (const [jsonKey, envKey] of Object.entries(ENV_MAP)) {
+      const value = data[jsonKey as keyof PersistedConfig];
+      if (value) env[envKey] = String(value);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Merge wired endpoints, saved app env, then deployment_config (user intent wins). */
+export function buildDetectProcessEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  applyDotenvFile(endpointsEnvPath(), env);
+  applyDotenvFile(appEnvironmentPath(), env);
+  applyDeploymentJson(env);
+
+  const mode = String(env.NIM_DEPLOY_MODE || "BUNDLED").toUpperCase();
+  if (mode === "SERVERLESS") {
+    const server = String(env.SVD_SERVER || "");
+    const host = server.split(":")[0]?.toLowerCase() || "";
+    if (host === "127.0.0.1" || host === "localhost") {
+      delete env.SVD_SERVER;
+    }
+  }
+  return env;
+}
+
+export function validateDetectEnv(env: NodeJS.ProcessEnv): string | null {
+  const mode = String(env.NIM_DEPLOY_MODE || "BUNDLED").toUpperCase();
+  if (mode === "SERVERLESS") {
+    if (!env.NGC_API_KEY?.trim()) {
+      return "NGC API key is not configured. Open Configure, enter your key, save, and build the pipeline.";
+    }
+    return null;
+  }
+  const server = String(env.SVD_SERVER || "");
+  const host = server.split(":")[0]?.toLowerCase() || "";
+  if (!server || host === "127.0.0.1" || host === "localhost") {
+    return "Bundled NIM is not running. Open Configure, build the pipeline, and wait for the GPU application to reach RUNNING.";
+  }
+  return null;
+}
+
 export function controlPlaneScript(): string {
   return path.join(projectRoot(), "cai/amp/7_deploy/control_plane_cli.py");
 }
@@ -44,29 +111,8 @@ export function pythonPath(): string {
 }
 
 export function applyPersistedConfigToProcessEnv(): void {
-  const configPath = deploymentConfigPath();
-  if (!fs.existsSync(configPath)) return;
-  try {
-    const data = JSON.parse(fs.readFileSync(configPath, "utf8")) as PersistedConfig;
-    for (const [jsonKey, envKey] of Object.entries(ENV_MAP)) {
-      const value = data[jsonKey as keyof PersistedConfig];
-      if (value) process.env[envKey] = String(value);
-    }
-  } catch {
-    /* ignore */
-  }
-  const endpointsPath = endpointsEnvPath();
-  if (fs.existsSync(endpointsPath)) {
-    for (const line of fs.readFileSync(endpointsPath, "utf8").split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
-      const eq = trimmed.indexOf("=");
-      const key = trimmed.slice(0, eq);
-      let val = trimmed.slice(eq + 1).trim();
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
-      process.env[key] = val;
-    }
+  const merged = buildDetectProcessEnv();
+  for (const [key, value] of Object.entries(merged)) {
+    if (value !== undefined) process.env[key] = value;
   }
 }
