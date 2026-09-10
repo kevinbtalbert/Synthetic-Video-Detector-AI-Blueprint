@@ -120,13 +120,26 @@ export default function DetectPage() {
     form.append("video", file);
 
     try {
-      const res = await fetch("/api/detect?stream=1", { method: "POST", body: form });
-      if (!res.ok || !res.body) {
+      let res = await fetch("/api/detect?stream=1", { method: "POST", body: form });
+      if (!res.ok && res.headers.get("content-type")?.includes("json")) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(data.error || "Detection failed");
       }
-
-      const reader = res.body.getReader();
+      if (!res.ok || !res.body) {
+        setPhase("analyzing");
+        setProgressMessage("Analyzing video (legacy API)…");
+        res = await fetch("/api/detect", { method: "POST", body: form });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error || "Detection failed");
+        }
+        const data = (await res.json()) as Result;
+        setPhase("done");
+        setProgressMessage("Detection complete");
+        setResult(data);
+        return;
+      }
+      const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
 

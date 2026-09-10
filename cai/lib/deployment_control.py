@@ -23,6 +23,7 @@ from cai.lib.deploy_mode import (
     NIMDeployMode,
     is_bundled_nim_mode,
     is_serverless_nim_mode,
+    normalize_nim_deploy_mode,
     write_serverless_endpoints_json,
 )
 from cai.lib.paths import CONFIG_DIR, ENDPOINTS_ENV, NIM_ENDPOINTS_JSON, PROJECT_ROOT, ensure_cai_dirs
@@ -269,9 +270,17 @@ def list_deployment_status() -> dict[str, Any]:
     except Exception as exc:
         services["error"] = str(exc)
 
+    config_mode = (
+        normalize_nim_deploy_mode(config.nim_deploy_mode)
+        if config
+        else normalize_nim_deploy_mode(None)
+    )
+    serverless = config_mode == NIMDeployMode.SERVERLESS
+
     endpoints_ready = ENDPOINTS_ENV.exists() and ENDPOINTS_ENV.read_text().strip() != ""
     required = _required_service_keys(config)
     running = pending = failed = 0
+    failed_services: list[dict[str, str]] = []
     for key in required:
         app = (services.get(key) or {}).get("application") or {}
         status = app.get("status", "")
@@ -279,16 +288,20 @@ def list_deployment_status() -> dict[str, Any]:
             running += 1
         elif _is_app_failed(status):
             failed += 1
+            failed_services.append({"name": (services.get(key) or {}).get("name", key), "status": status})
         elif app:
             pending += 1
 
     pipeline_ready = endpoints_ready and (
-        is_serverless_nim_mode() or (running == len(required) and failed == 0 and pending == 0)
+        serverless or (running == len(required) and failed == 0 and pending == 0)
     )
     build = reconcile_stale_build(
         pipeline_failed=failed > 0,
+        failed_services=failed_services,
         any_deployed_apps=bool(required),
     ) or read_build_progress()
+    build_in_progress = is_build_in_progress()
+    deploy_active = build_in_progress or (bool(required) and pending > 0 and failed == 0)
 
     return {
         "config": config.public_dict() if config else None,
@@ -300,7 +313,7 @@ def list_deployment_status() -> dict[str, Any]:
         "pipeline_ready": pipeline_ready,
         "pipeline_failed": failed > 0,
         "endpoints_ready": endpoints_ready,
-        "build_in_progress": is_build_in_progress(),
+        "build_in_progress": build_in_progress,
         "build": build,
-        "deploy_active": is_build_in_progress() or (required and pending > 0),
+        "deploy_active": deploy_active,
     }

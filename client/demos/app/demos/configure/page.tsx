@@ -150,12 +150,26 @@ export default function ConfigurePage() {
         </Card>
 
         <Card title="Pipeline status">
+          {status?.deploy_active && (
+            <p className="text-amber-400 mb-2 text-sm">
+              Deployment in progress… {status.build?.message || ""}
+            </p>
+          )}
           {pipelineReady && (
             <p className="text-green-400 mb-2">
               Ready — <Link href="/demos/detect" className="underline">run detection</Link>
             </p>
           )}
           {pipelineFailed && <p className="text-red-400 mb-2">One or more services failed.</p>}
+          {status?.services?.svd?.application && (
+            <p className="text-sm text-neutral-400 mb-2">
+              SVD NIM application:{" "}
+              <strong>{status.services.svd.application.status || "unknown"}</strong>
+            </p>
+          )}
+          {status?.build?.error && (
+            <p className="text-red-400 text-sm mb-2">{status.build.error}</p>
+          )}
           {status?.build?.steps?.map((step) => (
             <div key={step.id} className="text-sm py-1">
               {step.status === "done" ? "✓" : step.status === "running" ? "◌" : "○"} {step.label}

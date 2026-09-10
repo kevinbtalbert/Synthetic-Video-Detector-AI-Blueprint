@@ -21,6 +21,20 @@ def demo_ui_ready() -> bool:
     return SERVER_JS.is_file() and NEXT_DIR.is_dir()
 
 
+def demo_sources_newer_than_dist() -> bool:
+    """True when Launchpad app sources changed after the last next build."""
+    if not SERVER_JS.is_file():
+        return True
+    dist_mtime = SERVER_JS.stat().st_mtime
+    app_dir = DEMO_DIR / "app"
+    if not app_dir.is_dir():
+        return False
+    for path in app_dir.rglob("*"):
+        if path.is_file() and path.stat().st_mtime > dist_mtime:
+            return True
+    return False
+
+
 def _remove_path(path: Path) -> None:
     if path.is_symlink() or path.is_file():
         path.unlink()

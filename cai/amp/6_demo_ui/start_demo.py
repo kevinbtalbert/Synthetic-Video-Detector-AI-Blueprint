@@ -14,7 +14,14 @@ sys.path.insert(0, str(Path(os.environ.get("CDSW_PROJECT_DIR", "/home/cdsw"))))
 from cai.lib.amp_runtime import run_amp_entry  # noqa: E402
 from cai.lib.app_config import apply_persisted_config  # noqa: E402
 from cai.lib.cai_common import apply_dotenv_to_os  # noqa: E402
-from cai.lib.demo_ui import DEMO_DIR, SERVER_JS, ensure_demo_ui, missing_demo_ui_message  # noqa: E402
+from cai.lib.demo_ui import (  # noqa: E402
+    DEMO_DIR,
+    SERVER_JS,
+    demo_sources_newer_than_dist,
+    demo_ui_ready,
+    ensure_demo_ui,
+    missing_demo_ui_message,
+)
 from cai.lib.paths import ENDPOINTS_ENV, ensure_cai_dirs  # noqa: E402
 from cai.lib.runtime_env import log_runtime_context  # noqa: E402
 from cai.lib.service_env import load_config_defaults  # noqa: E402
@@ -35,9 +42,15 @@ def main() -> int:
     os.environ["PORT"] = str(port)
     os.environ.setdefault("NODE_ENV", "production")
 
+    if demo_sources_newer_than_dist():
+        os.environ.setdefault("FORCE_DEMO_BUILD", "1")
+        print("Launchpad sources changed — rebuilding Web UI before start", flush=True)
+
     if not ensure_demo_ui():
         print(missing_demo_ui_message(), flush=True)
         return 1
+    if demo_ui_ready():
+        print(f"Launchpad UI artifacts: {SERVER_JS}", flush=True)
 
     node = which("node") or "/usr/bin/node"
     if not Path(node).is_file():

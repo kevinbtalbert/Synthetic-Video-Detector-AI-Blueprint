@@ -15,17 +15,27 @@ from cai.lib.demo_ui import (  # noqa: E402
     SERVER_JS,
     build_demo_ui,
     copy_runtime_demo_ui,
+    demo_sources_newer_than_dist,
     demo_ui_ready,
 )
 
 
 def main() -> int:
-    if demo_ui_ready() and not os.environ.get("FORCE_DEMO_BUILD", "").strip():
+    force = bool(os.environ.get("FORCE_DEMO_BUILD", "").strip())
+    if (
+        demo_ui_ready()
+        and not force
+        and not demo_sources_newer_than_dist()
+    ):
         print(f"Web UI already built ({SERVER_JS}) — skipping npm build")
         print("Set FORCE_DEMO_BUILD=1 to rebuild after code changes.")
         return 0
 
-    if copy_runtime_demo_ui() and not os.environ.get("FORCE_DEMO_BUILD", "").strip():
+    if (
+        copy_runtime_demo_ui()
+        and not force
+        and not demo_sources_newer_than_dist()
+    ):
         print(f"Web UI ready from runtime image ({SERVER_JS})")
         return 0
 

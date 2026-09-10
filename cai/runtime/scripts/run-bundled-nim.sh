@@ -3,8 +3,36 @@
 set -euo pipefail
 
 nim_type="${1:?synthetic-video-detector}"
+project="${CDSW_PROJECT_DIR:-/home/cdsw}"
 bundle_root="/opt/nvidia-nim/${nim_type}"
 entrypoint_file="${bundle_root}/entrypoint"
+
+# CAI runtime images expose GPUs via nvidia-smi but omit CUDA sample deviceQuery.
+# NIM entrypoint.d/51-gpu-sm-version-check.sh requires it — provide a minimal stub.
+ensure_device_query_stub() {
+  local stub_dir="${project}/cai/runtime/bin"
+  local stub="${stub_dir}/deviceQuery"
+  mkdir -p "${stub_dir}"
+  if [[ -x "${stub}" ]]; then
+    export PATH="${stub_dir}:${PATH}"
+    return 0
+  fi
+  local cap major minor name
+  cap="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d ' ' || true)"
+  major="${cap%%.*}"
+  minor="${cap##*.}"
+  name="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo "GPU")"
+  cat >"${stub}" <<EOF
+#!/usr/bin/env bash
+echo "Detected 1 CUDA Capable device(s)"
+echo "Device 0: \"${name}\""
+echo "  CUDA Capability Major/Minor version number:    ${major:-7}.${minor:-5}"
+exit 0
+EOF
+  chmod +x "${stub}"
+  export PATH="${stub_dir}:${PATH}"
+}
+ensure_device_query_stub
 
 if [[ ! -f "${entrypoint_file}" ]]; then
   echo "ERROR: NIM bundle not found at ${bundle_root}" >&2

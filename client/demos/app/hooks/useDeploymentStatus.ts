@@ -4,6 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 
 export type StepStatus = "pending" | "running" | "done" | "error" | "skipped";
 
+export type ServiceStatus = {
+  key?: string;
+  name?: string;
+  application?: { status?: string; id?: string; subdomain?: string } | null;
+};
+
 export type DeploymentStatus = {
   pipeline_ready?: boolean;
   pipeline_failed?: boolean;
@@ -13,7 +19,13 @@ export type DeploymentStatus = {
   config?: Record<string, unknown>;
   secrets_set?: { ngc_api_key?: boolean };
   mode_summary?: { headline?: string; detail?: string };
-  build?: { error?: string; steps?: Array<{ id: string; label: string; status: StepStatus; detail?: string }> };
+  services?: Record<string, ServiceStatus>;
+  build?: {
+    error?: string;
+    message?: string;
+    in_progress?: boolean;
+    steps?: Array<{ id: string; label: string; status: StepStatus; detail?: string }>;
+  };
 };
 
 export function useDeploymentStatus({ pollWhilePending = false } = {}) {
