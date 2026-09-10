@@ -34,7 +34,6 @@ tasks:
 
   - type: start_application
     name: Synthetic Video Detector Launchpad
-    subdomain: synthetic-video-detector-ui
     script: cai/amp/6_demo_ui/start_demo.py
     short_summary: Start Launchpad — configure and build the detection pipeline
     long_summary: |

@@ -67,6 +67,8 @@ def write_nim_shell_env() -> Path:
         value = os.environ.get(key)
         if value is None:
             continue
+        if key == "NVIDIA_VISIBLE_DEVICES" and str(value).strip().lower() in {"void", "none", ""}:
+            continue
         lines.append(f"export {key}={shlex.quote(value)}")
     path.write_text("\n".join(lines) + "\n")
     return path
@@ -88,23 +90,45 @@ def tcp_port_open(host: str, port: int, *, timeout_s: float = 2.0) -> bool:
         return False
 
 
-def wait_for_nim_ready(http_port: int, grpc_port: int, *, timeout_s: int = 900) -> None:
+def _http_ready(url: str) -> bool:
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            return response.status == 200
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _models_loaded(http_port: int) -> bool:
+    url = f"http://127.0.0.1:{http_port}/v1/models"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            if response.status != 200:
+                return False
+            payload = json.loads(response.read().decode("utf-8", errors="replace"))
+            models = payload.get("data") or payload.get("models") or []
+            return len(models) > 0
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def wait_for_nim_ready(http_port: int, grpc_port: int, *, timeout_s: int = 3600) -> None:
+    """Wait until Triton HTTP is ready, at least one model is loaded, and gRPC is listening."""
     deadline = time.time() + timeout_s
     http_url = f"http://127.0.0.1:{http_port}/v1/health/ready"
     last_error = ""
     while time.time() < deadline:
-        http_ok = False
-        try:
-            with urllib.request.urlopen(http_url, timeout=10) as response:
-                http_ok = response.status == 200
-        except Exception as exc:  # noqa: BLE001
-            last_error = f"http: {exc}"
+        http_ok = _http_ready(http_url)
+        models_ok = _models_loaded(http_port) if http_ok else False
         grpc_ok = tcp_port_open("127.0.0.1", grpc_port)
-        if http_ok and grpc_ok:
+        if http_ok and models_ok and grpc_ok:
             return
-        if http_ok:
+        if http_ok and not models_ok:
+            last_error = "http ready but no models loaded yet"
+        elif http_ok and not grpc_ok:
             last_error = f"http ready but gRPC :{grpc_port} not listening"
-        time.sleep(5)
+        elif not http_ok:
+            last_error = "http health not ready"
+        time.sleep(10)
     raise TimeoutError(f"NIM readiness failed ({http_url}, gRPC :{grpc_port}): {last_error}")
 
 

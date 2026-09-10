@@ -29,6 +29,11 @@ PY
 
 source "${project}/cai/config/svd_nim.env"
 
+cache="${NIM_CACHE_PATH:-${project}/volumes/models/synthetic-video-detector}"
+baked="/opt/nvidia-nim/baked-model-cache/synthetic-video-detector"
+echo "Model cache: ${cache} (files: $(find "${cache}" -type f 2>/dev/null | wc -l | tr -d ' '))"
+echo "Baked cache: ${baked} (files: $(find "${baked}" -type f 2>/dev/null | wc -l | tr -d ' '))"
+
 if [[ -z "${NGC_API_KEY:-}" ]]; then
   echo "ERROR: NGC_API_KEY is empty" >&2
   exit 1
@@ -43,8 +48,15 @@ nohup python3 "${project}/cai/amp/4_services/run_nim_sidecar.py" \
   >>"${sidecar_log}" 2>&1 &
 echo "Started NIM sidecar (port ${app_port})"
 
-launcher="/usr/local/bin/run-bundled-nim"
+launcher="${project}/cai/runtime/scripts/run-bundled-nim.sh"
+if [[ -f "${launcher}" ]]; then
+  chmod u=rwx,go=rx "${launcher}" 2>/dev/null || true
+fi
 if [[ ! -x "${launcher}" ]]; then
-  launcher="${project}/cai/runtime/scripts/run-bundled-nim.sh"
+  launcher="/usr/local/bin/run-bundled-nim"
+fi
+if [[ ! -x "${launcher}" ]]; then
+  echo "ERROR: run-bundled-nim launcher not found or not executable" >&2
+  exit 1
 fi
 exec "${launcher}" synthetic-video-detector

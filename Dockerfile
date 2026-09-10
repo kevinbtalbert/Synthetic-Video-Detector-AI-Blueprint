@@ -34,7 +34,9 @@ RUN --mount=from=nim-svd,source=/,target=/nim-src,readonly \
 
 COPY build/nim-model-cache/synthetic-video-detector /opt/nvidia-nim/baked-model-cache/synthetic-video-detector
 RUN mkdir -p /opt/nvidia-nim/baked-model-cache/synthetic-video-detector && \
-    chown -R cdsw:cdsw "${NIM_BUNDLE_ROOT}/synthetic-video-detector" /opt/nvidia-nim/baked-model-cache
+    chown -R cdsw:cdsw "${NIM_BUNDLE_ROOT}" /opt/nvidia-nim/baked-model-cache && \
+    chmod -R u+rwX,go+rX "${NIM_BUNDLE_ROOT}" /opt/nvidia-nim/baked-model-cache && \
+    find "${NIM_BUNDLE_ROOT}/synthetic-video-detector" -type f \( -name '*.sh' -o -path '*/bin/*' \) -exec chmod u+rx,go+rx {} +
 
 WORKDIR ${APP_ROOT}
 COPY pyproject.toml README.md ./
@@ -52,18 +54,22 @@ RUN chmod +x scripts/docker/*.sh cai/runtime/scripts/*.sh && \
     chown -R cdsw:cdsw ${APP_ROOT} /var/lib/synthetic-video-detector
 
 COPY cai/runtime/scripts/run-bundled-nim.sh /usr/local/bin/run-bundled-nim
-RUN chmod +x /usr/local/bin/run-bundled-nim
+# nimlib expects /opt/nim — symlink bundled opt/nim for cdsw (non-root runtime user).
+RUN ln -sf "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/nim" /opt/nim && \
+    chown cdsw:cdsw /usr/local/bin/run-bundled-nim && \
+    chmod u=rwx,go=rx /usr/local/bin/run-bundled-nim
 
 USER cdsw
 WORKDIR ${APP_ROOT}
 
-# Runtime catalog metadata (match Cloudera custom-runtime convention; bump
-# ML_RUNTIME_MAINTENANCE_VERSION on each repush to register a new catalog entry).
+# Runtime catalog metadata (Cloudera custom-runtime convention).
+# short.maintenance → full version (e.g. 1.2.0). AMP matches on short version (1.2).
+# Bump ML_RUNTIME_MAINTENANCE_VERSION on each repush to register a new catalog entry.
 ENV ML_RUNTIME_EDITION="SyntheticVideoDetector" \
     ML_RUNTIME_EDITOR="JupyterLab" \
     ML_RUNTIME_KERNEL="Python 3.13" \
-    ML_RUNTIME_SHORT_VERSION="1" \
-    ML_RUNTIME_MAINTENANCE_VERSION="2" \
+    ML_RUNTIME_SHORT_VERSION="1.2" \
+    ML_RUNTIME_MAINTENANCE_VERSION="1" \
     ML_RUNTIME_DESCRIPTION="JupyterLab Runtime with NVIDIA Synthetic Video Detector NIM"
 
 ENV ML_RUNTIME_FULL_VERSION="${ML_RUNTIME_SHORT_VERSION}.${ML_RUNTIME_MAINTENANCE_VERSION}"

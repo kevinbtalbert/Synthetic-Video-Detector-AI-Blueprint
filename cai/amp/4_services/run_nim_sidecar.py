@@ -40,12 +40,18 @@ def main() -> int:
     args = parser.parse_args()
 
     def publisher() -> None:
-        try:
-            wait_for_nim_ready(args.http_port, args.grpc_port)
-            publish_nim_endpoint(grpc_port=args.grpc_port, http_port=args.http_port)
-            print("Published SVD endpoint metadata", flush=True)
-        except Exception as exc:  # noqa: BLE001
-            print(f"Endpoint publish failed: {exc}", flush=True)
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                print(f"Waiting for NIM readiness (attempt {attempt})...", flush=True)
+                wait_for_nim_ready(args.http_port, args.grpc_port)
+                publish_nim_endpoint(grpc_port=args.grpc_port, http_port=args.http_port)
+                print("Published SVD endpoint metadata", flush=True)
+                return
+            except Exception as exc:  # noqa: BLE001
+                print(f"Endpoint publish failed (attempt {attempt}): {exc}", flush=True)
+                time.sleep(60)
 
     threading.Thread(target=publisher, daemon=True).start()
     time.sleep(2)

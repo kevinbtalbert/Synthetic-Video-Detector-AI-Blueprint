@@ -27,11 +27,12 @@ from cai.lib.deploy_mode import (
     write_serverless_endpoints_json,
 )
 from cai.lib.paths import CONFIG_DIR, ENDPOINTS_ENV, NIM_ENDPOINTS_JSON, PROJECT_ROOT, ensure_cai_dirs
+from cai.lib.subdomains import unique_subdomain
 
 SERVICE_SPECS: dict[str, dict[str, Any]] = {
     "svd": {
         "name": "Synthetic Video Detector NIM",
-        "subdomain": "svd-nim",
+        "subdomain_base": "svd-nim",
         "script": "cai/amp/4_services/launch_svd_nim.py",
         "cpu": 4,
         "memory": 32,
@@ -144,10 +145,11 @@ def _ensure_application(
     if existing and _is_app_running(existing.status):
         return {"key": spec_key, "name": spec["name"], "application": existing.metadata, "created": False}
 
+    subdomain = unique_subdomain(spec["subdomain_base"])
     created = client.create_application(
         name=spec["name"],
         script=spec["script"],
-        subdomain=spec["subdomain"],
+        subdomain=subdomain,
         cpu=int(spec["cpu"]),
         memory=int(spec["memory"]),
         gpu=int(spec.get("gpu", 0)),
@@ -156,7 +158,7 @@ def _ensure_application(
     return {"key": spec_key, "name": spec["name"], "application": created.metadata, "created": True}
 
 
-def _wait_for_nim_endpoints(timeout_s: int = 1200) -> dict[str, Any]:
+def _wait_for_nim_endpoints(timeout_s: int = 3600) -> dict[str, Any]:
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         if NIM_ENDPOINTS_JSON.exists():
