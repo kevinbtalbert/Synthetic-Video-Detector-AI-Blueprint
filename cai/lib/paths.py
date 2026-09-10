@@ -10,7 +10,11 @@ CAI_ROOT = PROJECT_ROOT / "cai"
 CONFIG_DIR = CAI_ROOT / "config"
 ENDPOINTS_ENV = CONFIG_DIR / "runtime_endpoints.env"
 NIM_ENDPOINTS_JSON = CAI_ROOT / "nim_endpoints.json"
-VENV_PYTHON = PROJECT_ROOT / ".venv" / "bin" / "python"
+def runtime_python() -> str:
+    """Python for subprocess calls — always the active CAI/runtime interpreter."""
+    import sys
+
+    return sys.executable
 
 
 def media_dir() -> Path:

@@ -43,6 +43,26 @@ build/ec2-build-status
 build/ec2-launch.log
 build/ec2-monitor.log
 
+# Local CAI dev loop (credentials + feedback — do not commit)
+build/.cai-dev.env
+build/.cai-feedback.log
+build/tools/
+
+# Operator / Cursor dev tooling (customers deploy via AMP + .project-metadata.yaml)
+scripts/cai/
+scripts/test_serverless_nvcf.py
+cai/amp/0_spike/
+cai/amp/1_install/test_*.py
+cai/amp/1_install/nvcf_smoke_job.py
+cai/amp/1_install/print_*.py
+cai/amp/1_install/publish_smoke_status.py
+cai/amp/1_install/run_smoke_*.py
+cai/config/nvcf_smoke_result.json
+cai/config/STATUS_*.txt
+
+# macOS
+.DS_Store
+
 # Outputs
 outputs/
 media/

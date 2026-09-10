@@ -17,12 +17,22 @@ from cai.lib.paths import PROJECT_ROOT  # noqa: E402
 
 def main() -> int:
     os.chdir(PROJECT_ROOT)
-    print("Installing Synthetic Video Detector Python dependencies...")
+    print(f"Installing into runtime Python: {sys.executable}")
     if which("uv"):
-        subprocess.run(["uv", "sync", "--extra", "test"], check=True)
+        subprocess.run(
+            ["uv", "pip", "install", "--python", sys.executable, "-e", ".[test]"],
+            check=True,
+        )
     else:
-        subprocess.run([sys.executable, "-m", "pip", "install", "-e", ".", "-e", ".[test]"], check=True)
+        subprocess.run([sys.executable, "-m", "pip", "install", "-e", ".[test]"], check=True)
+    grpc_stub = (
+        PROJECT_ROOT
+        / "src/svd/generated/nvidia/maxine/syntheticvideodetector/v1/syntheticvideodetector_pb2_grpc.py"
+    )
     subprocess.run(["bash", "protos/generate_protos.sh"], check=True)
+    from src.svd.patch_grpc_stub import ensure_grpc_stub  # noqa: WPS433
+
+    ensure_grpc_stub()
     print("Dependencies and protobuf code ready")
     return 0
 

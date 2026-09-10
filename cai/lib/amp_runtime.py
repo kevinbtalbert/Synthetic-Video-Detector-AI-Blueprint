@@ -9,11 +9,16 @@ from typing import Callable
 
 
 def bootstrap_sys_path() -> Path:
-    """Put the project root on sys.path (safe when __file__ is undefined)."""
+    """Ensure the CAI project root wins over baked-in runtime image paths."""
     root = Path(os.environ.get("CDSW_PROJECT_DIR", "/home/cdsw"))
     root_str = str(root)
-    if root_str not in sys.path:
-        sys.path.insert(0, root_str)
+    # Unified runtime image sets PYTHONPATH=/opt/synthetic-video-detector — drop it so
+    # project sources (pip install -e . / uploaded files) are used instead.
+    image_roots = ("/opt/synthetic-video-detector",)
+    sys.path[:] = [p for p in sys.path if not any(p.startswith(r) for r in image_roots)]
+    if root_str in sys.path:
+        sys.path.remove(root_str)
+    sys.path.insert(0, root_str)
     return root
 
 

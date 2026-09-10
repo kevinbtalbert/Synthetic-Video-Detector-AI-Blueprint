@@ -5,13 +5,24 @@ import os from "os";
 import path from "path";
 import { applyPersistedConfigToProcessEnv, pythonPath, projectRoot } from "../utils/persistedConfig";
 
+type DetectPayload = {
+  probability: number;
+  logit: number;
+  synthetic_score_percent: number;
+  is_synthetic: boolean;
+  total_clips: number;
+  threshold: number;
+};
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   applyPersistedConfigToProcessEnv();
+  const stream = request.nextUrl.searchParams.get("stream") === "1";
   const form = await request.formData();
   const file = form.get("video");
   if (!(file instanceof Blob)) {
     return NextResponse.json({ error: "Missing video file" }, { status: 400 });
   }
+
   const buffer = Buffer.from(await file.arrayBuffer());
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "svd-"));
   const videoPath = path.join(tmpDir, "input.mp4");
@@ -20,13 +31,87 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const root = projectRoot();
   const env = { ...process.env, PYTHONPATH: [root, path.join(root, "src")].join(":") };
+  const cliArgs = [
+    "-m",
+    "src.svd.cli",
+    "--video-input",
+    videoPath,
+    "--output-json",
+    jsonPath,
+    ...(stream ? ["--progress-jsonl"] : []),
+  ];
+
+  if (stream) {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        const emit = (event: Record<string, unknown>) => {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        };
+
+        emit({ type: "phase", phase: "uploading", message: "Video received, starting detection…" });
+
+        const proc = spawn(pythonPath(), cliArgs, { env, cwd: root });
+        let stderr = "";
+        let stdoutBuffer = "";
+
+        proc.stdout.on("data", (chunk: Buffer) => {
+          stdoutBuffer += chunk.toString();
+          const lines = stdoutBuffer.split("\n");
+          stdoutBuffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              emit(JSON.parse(line) as Record<string, unknown>);
+            } catch {
+              // ignore non-JSON stdout
+            }
+          }
+        });
+
+        proc.stderr.on("data", (d) => {
+          stderr += d.toString();
+        });
+
+        proc.on("close", async (code) => {
+          try {
+            if (stdoutBuffer.trim()) {
+              try {
+                emit(JSON.parse(stdoutBuffer) as Record<string, unknown>);
+              } catch {
+                // ignore trailing non-JSON stdout
+              }
+            }
+            if (code !== 0) {
+              emit({ type: "error", error: stderr.trim() || "Detection failed" });
+              controller.close();
+              return;
+            }
+            const result = JSON.parse(await fs.readFile(jsonPath, "utf8")) as DetectPayload;
+            emit({ type: "done", ...result, threshold: result.threshold ?? 0.3 });
+          } catch (err) {
+            emit({
+              type: "error",
+              error: err instanceof Error ? err.message : "Failed to parse result",
+            });
+          } finally {
+            await fs.rm(tmpDir, { recursive: true, force: true });
+            controller.close();
+          }
+        });
+      },
+    });
+
+    return new NextResponse(body, {
+      headers: {
+        "Content-Type": "application/x-ndjson",
+        "Cache-Control": "no-cache",
+      },
+    });
+  }
 
   return new Promise<NextResponse>((resolve) => {
-    const proc = spawn(
-      pythonPath(),
-      ["-m", "src.svd.cli", "--video-input", videoPath, "--output-json", jsonPath],
-      { env, cwd: root },
-    );
+    const proc = spawn(pythonPath(), cliArgs, { env, cwd: root });
     let stderr = "";
     proc.stderr.on("data", (d) => (stderr += d.toString()));
     proc.on("close", async (code) => {

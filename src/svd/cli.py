@@ -11,10 +11,12 @@ import json
 import sys
 from pathlib import Path
 
-# Allow running from repo root without install
 ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+for image_root in ("/opt/synthetic-video-detector",):
+    sys.path[:] = [p for p in sys.path if not p.startswith(image_root)]
+if str(ROOT) in sys.path:
+    sys.path.remove(str(ROOT))
+sys.path.insert(0, str(ROOT))
 
 from src.svd.client import detect_video  # noqa: E402
 
@@ -24,9 +26,20 @@ def main() -> int:
     parser.add_argument("--video-input", required=True, help="Path to H.264 MP4 input")
     parser.add_argument("--output-json", default="", help="Optional JSON output path")
     parser.add_argument("--save-csv", default="", help="Optional CSV output path")
+    parser.add_argument(
+        "--progress-jsonl",
+        action="store_true",
+        help="Emit progress events as JSON lines on stdout (for Launchpad UI streaming)",
+    )
     args = parser.parse_args()
 
-    result = detect_video(args.video_input)
+    def emit_progress(event: dict[str, object]) -> None:
+        print(json.dumps(event), flush=True)
+
+    result = detect_video(
+        args.video_input,
+        on_progress=emit_progress if args.progress_jsonl else None,
+    )
     payload = {
         "probability": result.probability,
         "logit": result.logit,
@@ -35,7 +48,10 @@ def main() -> int:
         "total_clips": result.total_clips,
         "threshold": 0.30,
     }
-    print(json.dumps(payload, indent=2))
+    if args.progress_jsonl:
+        print(json.dumps({"type": "result", **payload}), flush=True)
+    else:
+        print(json.dumps(payload, indent=2))
 
     if args.output_json:
         Path(args.output_json).write_text(json.dumps(payload, indent=2) + "\n")

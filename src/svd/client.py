@@ -9,11 +9,15 @@ import math
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 import grpc
 
-from src.svd.generated.nvidia.maxine.syntheticvideodetector.v1 import (
+from src.svd.patch_grpc_stub import ensure_grpc_stub
+
+ensure_grpc_stub()
+
+from src.svd.generated.nvidia.maxine.syntheticvideodetector.v1 import (  # noqa: E402
     syntheticvideodetector_pb2,
     syntheticvideodetector_pb2_grpc,
 )
@@ -89,13 +93,21 @@ def _video_chunks(video_path: Path) -> Iterator[syntheticvideodetector_pb2.Detec
             yield syntheticvideodetector_pb2.DetectSyntheticVideoRequest(video_file_data=chunk)
 
 
-def detect_video(video_path: str | Path, *, timeout_s: int = 600) -> DetectionResult:
+def detect_video(
+    video_path: str | Path,
+    *,
+    timeout_s: int = 600,
+    on_progress: Callable[[dict[str, object]], None] | None = None,
+) -> DetectionResult:
     """Analyze an H.264 MP4 and return aggregated synthetic probability."""
     path = Path(video_path)
     if not path.is_file():
         raise FileNotFoundError(f"Video not found: {path}")
     if path.suffix.lower() != ".mp4":
         raise ValueError("Synthetic Video Detector supports MP4 (H.264) only")
+
+    if on_progress:
+        on_progress({"type": "phase", "phase": "connecting", "message": "Connecting to detector…"})
 
     target, use_tls, metadata = resolve_svd_target()
     if use_tls:
@@ -105,6 +117,9 @@ def detect_video(video_path: str | Path, *, timeout_s: int = 600) -> DetectionRe
     if metadata:
         channel = intercept_channel_with_metadata(channel, metadata)
 
+    if on_progress:
+        on_progress({"type": "phase", "phase": "uploading", "message": "Sending video to detector…"})
+
     stub = syntheticvideodetector_pb2_grpc.SyntheticVideoDetectorServiceStub(channel)
     clip_results: list[ClipResult] = []
     final_probability = 0.0
@@ -113,17 +128,44 @@ def detect_video(video_path: str | Path, *, timeout_s: int = 600) -> DetectionRe
     csv_data = ""
 
     responses = stub.DetectSyntheticVideo(_video_chunks(path), timeout=timeout_s)
+    analyzing_sent = False
     for response in responses:
         which = response.WhichOneof("stream_output")
         if which == "clip_result":
             clip = response.clip_result
             clip_results.append(ClipResult(index=clip.index, logit=clip.logit))
+            if on_progress:
+                if not analyzing_sent:
+                    analyzing_sent = True
+                    on_progress(
+                        {
+                            "type": "phase",
+                            "phase": "analyzing",
+                            "message": "Analyzing video clips…",
+                        }
+                    )
+                on_progress(
+                    {
+                        "type": "clip",
+                        "index": clip.index,
+                        "clips_done": len(clip_results),
+                    }
+                )
         elif which == "final_result":
             final = response.final_result
             final_logit = final.logit
             final_probability = final.probability or _expit(final.logit)
             total_clips = final.total_clips
             csv_data = final.csv_data or ""
+            if on_progress:
+                on_progress(
+                    {
+                        "type": "phase",
+                        "phase": "finalizing",
+                        "message": "Summarizing results…",
+                        "total_clips": total_clips,
+                    }
+                )
         elif which == "keepalive":
             continue
 

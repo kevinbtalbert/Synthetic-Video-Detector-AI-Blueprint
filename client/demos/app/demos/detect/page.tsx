@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useDropzone } from "react-dropzone";
 import Header from "@/app/components/atoms/Header";
 import Card from "@/app/components/atoms/Card";
+import DetectionProgress, { type DetectPhase } from "@/app/components/atoms/DetectionProgress";
 import { useDeploymentStatus } from "@/app/hooks/useDeploymentStatus";
 
 type Result = {
@@ -15,13 +16,33 @@ type Result = {
   threshold: number;
 };
 
+type StreamEvent = {
+  type?: string;
+  phase?: string;
+  message?: string;
+  clips_done?: number;
+  total_clips?: number;
+  index?: number;
+  error?: string;
+  synthetic_score_percent?: number;
+  is_synthetic?: boolean;
+  probability?: number;
+  threshold?: number;
+};
+
 export default function DetectPage() {
   const { pipelineReady, status } = useDeploymentStatus({});
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<DetectPhase>("idle");
+  const [progressMessage, setProgressMessage] = useState("");
+  const [clipsDone, setClipsDone] = useState(0);
+  const [totalClips, setTotalClips] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const onDrop = useCallback((accepted: File[]) => {
     const f = accepted[0];
@@ -30,6 +51,9 @@ export default function DetectPage() {
     setPreview(URL.createObjectURL(f));
     setResult(null);
     setError(null);
+    setPhase("idle");
+    setClipsDone(0);
+    setTotalClips(null);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -37,20 +61,91 @@ export default function DetectPage() {
     accept: { "video/mp4": [".mp4"] },
     maxFiles: 1,
     maxSize: 500 * 1024 * 1024,
+    disabled: busy,
   });
+
+  useEffect(() => {
+    if (!busy) {
+      if (timerRef.current) clearInterval(timerRef.current);
+      return;
+    }
+    setElapsedSeconds(0);
+    timerRef.current = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [busy]);
+
+  const applyStreamEvent = (event: StreamEvent) => {
+    if (event.type === "phase" && event.phase) {
+      setPhase(event.phase as DetectPhase);
+      if (event.message) setProgressMessage(event.message);
+      if (typeof event.total_clips === "number") setTotalClips(event.total_clips);
+    }
+    if (event.type === "clip") {
+      setPhase("analyzing");
+      if (typeof event.clips_done === "number") setClipsDone(event.clips_done);
+      else if (typeof event.index === "number") setClipsDone(event.index + 1);
+      setProgressMessage("Analyzing video clips…");
+    }
+    if (event.type === "done" || event.type === "result") {
+      setPhase("done");
+      setProgressMessage("Detection complete");
+      if (typeof event.total_clips === "number") setTotalClips(event.total_clips);
+      setResult({
+        probability: Number(event.probability ?? 0),
+        synthetic_score_percent: Number(event.synthetic_score_percent ?? 0),
+        is_synthetic: Boolean(event.is_synthetic),
+        total_clips: Number(event.total_clips ?? 0),
+        threshold: Number(event.threshold ?? 0.3),
+      });
+    }
+    if (event.type === "error") {
+      setPhase("error");
+      setError(event.error || "Detection failed");
+    }
+  };
 
   const runDetection = async () => {
     if (!file) return;
     setBusy(true);
     setError(null);
+    setResult(null);
+    setClipsDone(0);
+    setTotalClips(null);
+    setPhase("uploading");
+    setProgressMessage("Uploading video…");
+
     const form = new FormData();
     form.append("video", file);
+
     try {
-      const res = await fetch("/api/detect", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Detection failed");
-      setResult(data);
+      const res = await fetch("/api/detect?stream=1", { method: "POST", body: form });
+      if (!res.ok || !res.body) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || "Detection failed");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          applyStreamEvent(JSON.parse(line) as StreamEvent);
+        }
+      }
+      if (buffer.trim()) {
+        applyStreamEvent(JSON.parse(buffer) as StreamEvent);
+      }
     } catch (err) {
+      setPhase("error");
       setError(err instanceof Error ? err.message : "Detection failed");
     } finally {
       setBusy(false);
@@ -81,7 +176,7 @@ export default function DetectPage() {
             {...getRootProps()}
             className={`cursor-pointer rounded border-2 border-dashed p-10 text-center ${
               isDragActive ? "border-[var(--nvidia-green)]" : "border-neutral-700"
-            }`}
+            } ${busy ? "pointer-events-none opacity-60" : ""}`}
           >
             <input {...getInputProps()} />
             {file ? file.name : "Drop MP4 here or click to browse"}
@@ -89,12 +184,21 @@ export default function DetectPage() {
           {preview && (
             <video src={preview} controls className="mt-4 w-full max-h-80 rounded bg-black" />
           )}
+
+          <DetectionProgress
+            phase={phase}
+            message={progressMessage}
+            clipsDone={clipsDone}
+            totalClips={totalClips}
+            elapsedSeconds={elapsedSeconds}
+          />
+
           <button
             className="mt-4 rounded bg-[var(--nvidia-green)] px-4 py-2 font-medium text-black disabled:opacity-50"
-            disabled={!file || busy}
+            disabled={!file || busy || !pipelineReady}
             onClick={() => void runDetection()}
           >
-            {busy ? "Analyzing…" : "Run detection"}
+            {busy ? "Detection in progress…" : "Run detection"}
           </button>
         </Card>
 
