@@ -61,12 +61,12 @@ RUN if [ -f package-lock.json ]; then npm ci && npm run build; elif [ -f package
 WORKDIR ${APP_ROOT}
 
 LABEL com.cloudera.ml.runtime.edition="SyntheticVideoDetector" \
-      com.cloudera.ml.runtime.full.version="1.0.0" \
-      com.cloudera.ml.runtime.short.version="1.0" \
+      com.cloudera.ml.runtime.full.version="1.1.0" \
+      com.cloudera.ml.runtime.short.version="1.1" \
       ML_RUNTIME_EDITOR="JupyterLab" \
       ML_RUNTIME_KERNEL="Python 3.13" \
       ML_RUNTIME_EDITION="SyntheticVideoDetector" \
-      ML_RUNTIME_FULL_VERSION="1.0.0" \
-      ML_RUNTIME_SHORT_VERSION="1.0"
+      ML_RUNTIME_FULL_VERSION="1.1.0" \
+      ML_RUNTIME_SHORT_VERSION="1.1"
 
 ENV PYTHONPATH="${APP_ROOT}:${APP_ROOT}/src"

@@ -17,7 +17,7 @@ echo "$NGC_API_KEY" | docker login nvcr.io -u '$oauthtoken' --password-stdin
 ./scripts/docker/build-svd-image.sh
 ```
 
-Register **SyntheticVideoDetector** v1.0 in Runtime Catalog (`cai/runtime/METADATA.yaml`).
+Register **SyntheticVideoDetector** v1.1 in Runtime Catalog (`cai/runtime/METADATA.yaml`).
 
 ## AMP tasks
 

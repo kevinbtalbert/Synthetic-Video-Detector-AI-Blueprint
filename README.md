@@ -21,7 +21,7 @@ Launchpad UI (Next.js)
 - **NGC API key** with Synthetic Video Detector entitlement ([generate key](https://org.ngc.nvidia.com/setup/api-key))
 - **Bundled mode:** GPU with NVENC/NVDEC (T4, L4, A10, L40, RTX — not A100/H100). See [support matrix](https://docs.nvidia.com/nim/maxine/synthetic-video-detector/latest/support-matrix.html).
 - **Serverless mode:** Outbound HTTPS to `grpc.nvcf.nvidia.com` (evaluation use only)
-- **Cloudera AI:** Custom runtime **SyntheticVideoDetector** v1.0, 8 GB shared memory for bundled NIM
+- **Cloudera AI:** Custom runtime **SyntheticVideoDetector** v1.1, 8 GB shared memory for bundled NIM
 
 ## Quick start (local docker-compose)
 
@@ -49,10 +49,10 @@ export NGC_API_KEY='your-key'
 echo "$NGC_API_KEY" | docker login nvcr.io -u '$oauthtoken' --password-stdin
 
 ./scripts/docker/build-svd-image.sh
-# → synthetic-video-detector:1.0.0-<gpu-arch>
+# → synthetic-video-detector:1.1.0-<gpu-arch>
 
 unset NGC_API_KEY
-docker push <your-registry>/synthetic-video-detector:1.0.0-turing
+docker push <your-registry>/synthetic-video-detector:1.1.0-turing
 ```
 
 Register in **Admin → Runtime Catalog** using `cai/runtime/METADATA.yaml` (edition: `SyntheticVideoDetector`).
