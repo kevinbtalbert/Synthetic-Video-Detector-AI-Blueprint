@@ -11,6 +11,9 @@ export default function Header() {
         <Link href="/demos/detect" className="hover:text-[var(--nvidia-green)]">
           Detect
         </Link>
+        <Link href="/demos/demo" className="hover:text-[var(--nvidia-green)]">
+          Demo
+        </Link>
         <Link href="/demos/configure" className="hover:text-[var(--nvidia-green)]">
           Configure
         </Link>

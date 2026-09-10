@@ -75,7 +75,7 @@ def runtime_identifier_from_cml_api() -> str | None:
     for app in client.list_applications():
         script = str(app.metadata.get("script", ""))
         name = app.name or ""
-        if script_hint in script or "Launchpad" in name or "Demo UI" in name:
+        if script_hint in script or "Launchpad" in name or "Build UI" in name:
             for key in ("runtime_identifier", "runtime", "kernel", "image_identifier"):
                 value = str(app.metadata.get(key, "")).strip()
                 if _looks_like_image_ref(value):

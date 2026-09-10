@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start the Synthetic Video Detector Launchpad (Next.js demo UI)."""
+"""Start the Synthetic Video Detector Launchpad (Next.js UI)."""
 
 from __future__ import annotations
 
@@ -17,9 +17,7 @@ from cai.lib.cai_common import apply_dotenv_to_os  # noqa: E402
 from cai.lib.demo_ui import (  # noqa: E402
     DEMO_DIR,
     SERVER_JS,
-    demo_sources_newer_than_dist,
     demo_ui_ready,
-    ensure_demo_ui,
     missing_demo_ui_message,
 )
 from cai.lib.paths import ENDPOINTS_ENV, ensure_cai_dirs  # noqa: E402
@@ -42,15 +40,11 @@ def main() -> int:
     os.environ["PORT"] = str(port)
     os.environ.setdefault("NODE_ENV", "production")
 
-    if demo_sources_newer_than_dist():
-        os.environ.setdefault("FORCE_DEMO_BUILD", "1")
-        print("Launchpad sources changed — rebuilding Web UI before start", flush=True)
-
-    if not ensure_demo_ui():
+    if not demo_ui_ready():
         print(missing_demo_ui_message(), flush=True)
         return 1
-    if demo_ui_ready():
-        print(f"Launchpad UI artifacts: {SERVER_JS}", flush=True)
+
+    print(f"Launchpad UI artifacts: {SERVER_JS}", flush=True)
 
     node = which("node") or "/usr/bin/node"
     if not Path(node).is_file():

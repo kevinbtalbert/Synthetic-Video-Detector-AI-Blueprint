@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Next.js demo UI (skipped when dist/ exists in project or runtime image)."""
+"""Build Next.js UI in the CAI project workspace (AMP step 2)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,6 @@ from cai.lib.amp_runtime import run_amp_entry  # noqa: E402
 from cai.lib.demo_ui import (  # noqa: E402
     SERVER_JS,
     build_demo_ui,
-    copy_runtime_demo_ui,
     demo_sources_newer_than_dist,
     demo_ui_ready,
 )
@@ -22,26 +21,16 @@ from cai.lib.demo_ui import (  # noqa: E402
 
 def main() -> int:
     force = bool(os.environ.get("FORCE_DEMO_BUILD", "").strip())
-    if (
-        demo_ui_ready()
-        and not force
-        and not demo_sources_newer_than_dist()
-    ):
-        print(f"Web UI already built ({SERVER_JS}) — skipping npm build")
+
+    if demo_ui_ready() and not force and not demo_sources_newer_than_dist():
+        print(f"UI already built ({SERVER_JS}) — skipping npm build")
         print("Set FORCE_DEMO_BUILD=1 to rebuild after code changes.")
         return 0
 
-    if (
-        copy_runtime_demo_ui()
-        and not force
-        and not demo_sources_newer_than_dist()
-    ):
-        print(f"Web UI ready from runtime image ({SERVER_JS})")
-        return 0
-
+    print("Building Next.js UI in project workspace ...", flush=True)
     try:
         if build_demo_ui():
-            print(f"Web UI built ({SERVER_JS})")
+            print(f"UI built ({SERVER_JS})")
             return 0
     except subprocess.CalledProcessError:
         return 1

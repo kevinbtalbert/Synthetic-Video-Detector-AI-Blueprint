@@ -55,9 +55,6 @@ COPY cai/runtime/scripts/run-bundled-nim.sh /usr/local/bin/run-bundled-nim
 RUN chmod +x /usr/local/bin/run-bundled-nim
 
 USER cdsw
-WORKDIR ${APP_ROOT}/client/demos
-RUN if [ -f package-lock.json ]; then npm ci && npm run build; elif [ -f package.json ]; then npm install && npm run build; fi
-
 WORKDIR ${APP_ROOT}
 
 LABEL com.cloudera.ml.runtime.edition="SyntheticVideoDetector" \
