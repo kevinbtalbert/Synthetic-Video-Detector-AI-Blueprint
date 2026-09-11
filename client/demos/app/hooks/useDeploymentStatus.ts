@@ -4,6 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 
 export type StepStatus = "pending" | "running" | "done" | "error" | "skipped";
 
+export type NimStartupStatus = {
+  phase?: string;
+  message?: string;
+  ready?: boolean;
+  error?: string | null;
+  elapsed_s?: number;
+  checks?: Record<string, boolean>;
+  log_tail?: string[];
+};
+
 export type ServiceStatus = {
   key?: string;
   name?: string;
@@ -12,6 +22,7 @@ export type ServiceStatus = {
   app_running?: boolean;
   app_failed?: boolean;
   application?: { status?: string; id?: string; subdomain?: string } | null;
+  nim_startup?: NimStartupStatus | null;
 };
 
 export type DeploymentStatus = {
@@ -83,7 +94,15 @@ export function useDeploymentStatus({ pollWhilePending = false } = {}) {
         !entry.app_running &&
         !entry.app_failed,
     );
-    if (!status?.deploy_active && !status?.build_in_progress && !awaitingOnline) return;
+    const bundledNimStarting = Object.values(status?.deployments || status?.services || {}).some(
+      (entry) =>
+        entry?.key === "bundled" &&
+        entry.app_running &&
+        !entry.ready &&
+        !entry.app_failed,
+    );
+    if (!status?.deploy_active && !status?.build_in_progress && !awaitingOnline && !bundledNimStarting)
+      return;
     const id = setInterval(() => void refresh(), 4000);
     return () => clearInterval(id);
   }, [

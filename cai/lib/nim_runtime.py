@@ -114,21 +114,47 @@ def _models_loaded(http_port: int) -> bool:
 
 def wait_for_nim_ready(http_port: int, grpc_port: int, *, timeout_s: int = 3600) -> None:
     """Wait until Triton HTTP is ready, at least one model is loaded, and gRPC is listening."""
+    from cai.lib.nim_startup import mark_nim_startup_error, update_nim_startup
+
     deadline = time.time() + timeout_s
     http_url = f"http://127.0.0.1:{http_port}/v1/health/ready"
     last_error = ""
+    poll = 0
     while time.time() < deadline:
+        poll += 1
         http_ok = _http_ready(http_url)
         models_ok = _models_loaded(http_port) if http_ok else False
         grpc_ok = tcp_port_open("127.0.0.1", grpc_port)
+        checks = {
+            "http_ready": http_ok,
+            "grpc_ready": grpc_ok,
+            "models_loaded": models_ok,
+        }
         if http_ok and grpc_ok and (models_ok or grpc_ok):
+            update_nim_startup(
+                "ready",
+                f"NIM is ready (HTTP :{http_port}, gRPC :{grpc_port})",
+                ready=True,
+                checks=checks,
+            )
             return
-        if http_ok and not grpc_ok:
-            last_error = f"http ready but gRPC :{grpc_port} not listening"
-        elif not http_ok:
+        if not http_ok:
+            phase = "waiting_http"
+            message = f"Waiting for NIM HTTP health on :{http_port} (poll #{poll})…"
             last_error = "http health not ready"
+        elif not grpc_ok:
+            phase = "waiting_grpc"
+            message = f"HTTP ready — waiting for gRPC on :{grpc_port} (poll #{poll})…"
+            last_error = f"http ready but gRPC :{grpc_port} not listening"
+        else:
+            phase = "loading_models"
+            message = f"Waiting for models to load (poll #{poll}; first run can take 15–30+ min)…"
+            last_error = "models not loaded yet"
+        update_nim_startup(phase, message, checks=checks)
         time.sleep(10)
-    raise TimeoutError(f"NIM readiness failed ({http_url}, gRPC :{grpc_port}): {last_error}")
+    err = f"NIM readiness failed ({http_url}, gRPC :{grpc_port}): {last_error}"
+    mark_nim_startup_error(err)
+    raise TimeoutError(err)
 
 
 def publish_nim_endpoint(*, grpc_port: int, http_port: int) -> dict[str, Any]:

@@ -22,6 +22,7 @@ from cai.lib.build_progress import (
 )
 from cai.lib.cml_client import ApplicationInfo, CMLClient
 from cai.lib.deploy_mode import NIMDeployMode, normalize_nim_deploy_mode
+from cai.lib.nim_startup import read_nim_startup
 from cai.lib.paths import CONFIG_DIR, ENDPOINTS_ENV, NIM_ENDPOINTS_JSON, ensure_cai_dirs
 from cai.lib.subdomains import unique_subdomain
 
@@ -224,9 +225,11 @@ def _deployment_entry(spec_key: str, app: ApplicationInfo | None) -> dict[str, A
     if spec_key == "serverless":
         endpoints_ready = _is_app_running(app_status)
     elif spec_key == "bundled":
-        endpoints_ready = NIM_ENDPOINTS_JSON.exists() and _is_app_running(app_status)
+        nim_startup = read_nim_startup() or {}
+        endpoints_ready = bool(nim_startup.get("ready")) or NIM_ENDPOINTS_JSON.exists()
+        endpoints_ready = endpoints_ready and _is_app_running(app_status)
 
-    return {
+    entry: dict[str, Any] = {
         "key": spec_key,
         "name": spec["name"],
         "mode": spec["mode"],
@@ -236,6 +239,9 @@ def _deployment_entry(spec_key: str, app: ApplicationInfo | None) -> dict[str, A
         "ready": endpoints_ready and _is_app_running(app_status),
         "subdomain": (app_meta or {}).get("subdomain"),
     }
+    if spec_key == "bundled":
+        entry["nim_startup"] = read_nim_startup()
+    return entry
 
 
 def list_deployment_status() -> dict[str, Any]:
@@ -296,4 +302,5 @@ def list_deployment_status() -> dict[str, Any]:
             "headline": "Launchpad — generate standalone Serverless or Bundled runtime applications.",
             "detail": "This app only configures and deploys. Open each generated app URL for Detect and Demo.",
         },
+        "nim_startup": read_nim_startup(),
     }

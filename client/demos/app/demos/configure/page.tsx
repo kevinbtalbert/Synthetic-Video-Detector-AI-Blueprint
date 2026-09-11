@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Header from "@/app/components/atoms/Header";
 import Card from "@/app/components/atoms/Card";
 import SecretInput from "@/app/components/atoms/SecretInput";
+import { NimStartupDetails } from "@/app/components/atoms/NimStartupProgress";
 import { useDeploymentStatus, type ServiceStatus } from "@/app/hooks/useDeploymentStatus";
 
 type DeployMode = "SERVERLESS" | "BUNDLED";
@@ -137,7 +138,16 @@ function DeploySection({
           <p className="text-green-400">Ready — use the app URL above for Detect and Demo.</p>
         )}
         {mode === "BUNDLED" && running && !ready && (
-          <p className="text-amber-400">NIM is starting inside the app (first run can take 15–30+ minutes).</p>
+          <div className="mt-4 space-y-3">
+            <p className="text-amber-400">NIM is starting inside the app (first run can take 15–30+ minutes).</p>
+            {deployment?.nim_startup && (
+              <NimStartupDetails
+                startup={deployment.nim_startup}
+                ready={ready}
+                compact
+              />
+            )}
+          </div>
         )}
       </div>
     </Card>

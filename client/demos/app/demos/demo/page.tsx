@@ -3,6 +3,8 @@
 import Link from "next/link";
 import Header from "@/app/components/atoms/Header";
 import LaunchpadDeployBanner from "@/app/components/atoms/LaunchpadDeployBanner";
+import NimStartupProgress from "@/app/components/atoms/NimStartupProgress";
+import { useAppRole } from "@/app/hooks/useAppRole";
 import Card from "@/app/components/atoms/Card";
 import SampleDetectionPanel, {
   type SampleVideo,
@@ -27,6 +29,7 @@ const SAMPLE_VIDEOS: SampleVideo[] = [
 ];
 
 export default function DemoPage() {
+  const { isRuntime } = useAppRole();
   const { pipelineReady, status } = useDeploymentStatus({});
   const mode = resolveDeployMode(status);
 
@@ -35,6 +38,7 @@ export default function DemoPage() {
       <Header />
       <main className="mx-auto max-w-6xl space-y-6 p-6">
         <LaunchpadDeployBanner pipelineReady={pipelineReady} />
+        {isRuntime && String(mode).toUpperCase() === "BUNDLED" && <NimStartupProgress />}
 
         <Card title="Demo">
           <p className="mb-6 text-sm text-neutral-400">

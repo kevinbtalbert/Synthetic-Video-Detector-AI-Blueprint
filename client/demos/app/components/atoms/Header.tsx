@@ -1,8 +1,10 @@
+"use client";
+
 import Link from "next/link";
-import { getAppRole } from "@/app/lib/appRole";
+import { useAppRole } from "@/app/hooks/useAppRole";
 
 export default function Header() {
-  const isLaunchpad = getAppRole() === "launchpad";
+  const { isLaunchpad } = useAppRole();
 
   return (
     <header className="border-b border-neutral-800 px-6 py-4 flex items-center justify-between">

@@ -4,14 +4,18 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import Header from "@/app/components/atoms/Header";
 import LaunchpadDeployBanner from "@/app/components/atoms/LaunchpadDeployBanner";
+import NimStartupProgress from "@/app/components/atoms/NimStartupProgress";
 import Card from "@/app/components/atoms/Card";
 import DetectionProgress from "@/app/components/atoms/DetectionProgress";
 import DetectionResultSummary from "@/app/components/atoms/DetectionResultSummary";
 import { useVideoDetection } from "@/app/hooks/useVideoDetection";
+import { useAppRole } from "@/app/hooks/useAppRole";
 import { resolveDeployMode, useDeploymentStatus } from "@/app/hooks/useDeploymentStatus";
 
 export default function DetectPage() {
+  const { isRuntime } = useAppRole();
   const { pipelineReady, status } = useDeploymentStatus({});
+  const canRunDetection = isRuntime || pipelineReady;
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const detection = useVideoDetection();
@@ -42,6 +46,7 @@ export default function DetectPage() {
       <Header />
       <main className="mx-auto max-w-4xl space-y-6 p-6">
         <LaunchpadDeployBanner pipelineReady={pipelineReady} />
+        {isRuntime && String(mode).toUpperCase() === "BUNDLED" && <NimStartupProgress />}
 
         <Card title="Upload video">
           <p className="text-sm text-neutral-400 mb-4">
@@ -69,12 +74,17 @@ export default function DetectPage() {
           />
 
           <button
-            className="mt-4 rounded bg-[var(--nvidia-green)] px-4 py-2 font-medium text-black disabled:opacity-50"
-            disabled={!file || detection.busy || !pipelineReady}
+            className="mt-4 rounded bg-[var(--nvidia-green)] px-4 py-2 font-medium text-black disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!file || detection.busy || !canRunDetection}
             onClick={() => file && void detection.runDetection(file)}
           >
             {detection.busy ? "Detection in progress…" : "Run detection"}
           </button>
+          {!canRunDetection && file && (
+            <p className="mt-2 text-sm text-amber-400">
+              Waiting for the deployed runtime application to become ready…
+            </p>
+          )}
         </Card>
 
         {detection.error && <p className="text-red-400">{detection.error}</p>}

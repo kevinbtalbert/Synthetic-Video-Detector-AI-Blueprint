@@ -21,6 +21,7 @@ cai/config/deployment_config.json
 cai/config/app_environment.env
 cai/config/runtime_endpoints.env
 cai/config/build_progress.json
+cai/config/nim_startup.json
 cai/config/build.lock
 cai/config/*_nim.env
 cai/config/*_sidecar.log
