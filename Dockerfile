@@ -47,7 +47,7 @@ COPY client ./client
 COPY assets ./assets
 COPY scripts/docker ./scripts/docker
 
-RUN chmod +x scripts/docker/*.sh cai/runtime/scripts/*.sh && \
+RUN chmod +x scripts/docker/*.sh cai/runtime/scripts/*.sh cai/amp/5_apps/*.sh && \
     uv sync --extra test && \
     bash protos/generate_protos.sh 2>/dev/null || true && \
     mkdir -p /var/lib/synthetic-video-detector/models && \
@@ -56,6 +56,9 @@ RUN chmod +x scripts/docker/*.sh cai/runtime/scripts/*.sh && \
 COPY cai/runtime/scripts/run-bundled-nim.sh /usr/local/bin/run-bundled-nim
 # nimlib expects /opt/nim — symlink bundled opt/nim for cdsw (non-root runtime user).
 RUN ln -sf "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/nim" /opt/nim && \
+    mkdir -p "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/nim/workspace" && \
+    chown -R cdsw:cdsw /opt/nim "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/nim/workspace" && \
+    chmod u=rwx,go=rx "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/nim/workspace" && \
     chown cdsw:cdsw /usr/local/bin/run-bundled-nim && \
     chmod u=rwx,go=rx /usr/local/bin/run-bundled-nim
 
@@ -69,7 +72,7 @@ ENV ML_RUNTIME_EDITION="SyntheticVideoDetector" \
     ML_RUNTIME_EDITOR="JupyterLab" \
     ML_RUNTIME_KERNEL="Python 3.13" \
     ML_RUNTIME_SHORT_VERSION="1.3" \
-    ML_RUNTIME_MAINTENANCE_VERSION="0" \
+    ML_RUNTIME_MAINTENANCE_VERSION="1" \
     ML_RUNTIME_DESCRIPTION="JupyterLab Runtime with NVIDIA Synthetic Video Detector NIM"
 
 ENV ML_RUNTIME_FULL_VERSION="${ML_RUNTIME_SHORT_VERSION}.${ML_RUNTIME_MAINTENANCE_VERSION}"

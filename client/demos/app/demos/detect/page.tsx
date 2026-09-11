@@ -41,13 +41,13 @@ export default function DetectPage() {
     <div className="min-h-screen">
       <Header />
       <main className="mx-auto max-w-4xl space-y-6 p-6">
-        {!pipelineReady && (
+        {!pipelineReady && (process.env.NEXT_PUBLIC_SVD_APP_ROLE || "launchpad") === "launchpad" && (
           <p className="rounded border border-amber-800 bg-amber-950/40 px-4 py-3 text-sm">
-            Pipeline not ready —{" "}
+            Deploy a runtime application from the{" "}
             <Link href="/demos/configure" className="underline">
-              configure and build
+              Launchpad
             </Link>{" "}
-            first (serverless mode wires endpoints immediately after build).
+            first, then open that app&apos;s URL to run detection.
           </p>
         )}
 

@@ -93,7 +93,9 @@ if [[ -d "${baked_root}" ]] && find "${baked_root}" -type f ! -name '.gitkeep' -
 fi
 
 export NVCF_MODELS_DIR="${NIM_CACHE_PATH}"
-export PATH="${bundle_root}/usr/local/bin:${bundle_root}/usr/bin:${PATH:-}"
+
+# Bundled NIM must not inherit Cloudera/Jupyter PYTHONPATH — it breaks gRPC servicer registration.
+nim_bin_path="${bundle_root}/usr/local/bin:${bundle_root}/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # nimlib hardcodes /opt/nim; map bundled layout when the canonical path is absent.
 if [[ ! -e /opt/nim && -d "${bundle_root}/opt/nim" ]]; then
@@ -116,18 +118,145 @@ if [[ ! -e /opt/nim && -d "${bundle_root}/opt/nim" ]]; then
   fi
 fi
 
-nimlib_dir="$(find "${bundle_root}" -path '*/dist-packages/nimlib' -type d 2>/dev/null | head -1 || true)"
-python_paths=("${bundle_root}/opt/nim")
-if [[ -n "${nimlib_dir}" ]]; then
-  python_paths+=("$(dirname "${nimlib_dir}")")
-fi
-export PYTHONPATH="$(IFS=:; echo "${python_paths[*]}")${PYTHONPATH:+:${PYTHONPATH}}"
+collect_bundled_pythonpath() {
+  local -a paths=("${bundle_root}/opt/nim")
+  local site_dir
+  while IFS= read -r site_dir; do
+    paths+=("${site_dir}")
+  done < <(
+    find "${bundle_root}" -type d \( -name dist-packages -o -name site-packages \) 2>/dev/null | sort -u
+  )
+  local seen="" item
+  for item in "${paths[@]}"; do
+    [[ -n "${item}" && -d "${item}" ]] || continue
+    case ":${seen}:" in
+      *:"${item}":*) continue ;;
+    esac
+    seen="${seen}:${item}"
+    printf '%s\n' "${item}"
+  done
+}
+map_bundle_path() {
+  local abs="$1"
+  case "${abs}" in
+    "${bundle_root}"/*)
+      echo "${abs}"
+      ;;
+    /usr/local/bin/*|/usr/bin/*|/usr/local/lib/*|/opt/nim/*)
+      local candidate="${bundle_root}${abs}"
+      if [[ -e "${candidate}" ]]; then
+        echo "${candidate}"
+      else
+        echo "${abs}"
+      fi
+      ;;
+    *)
+      echo "${abs}"
+      ;;
+  esac
+}
+read_script_shebang() {
+  local script="$1"
+  [[ -f "${script}" ]] || return 1
+  head -1 "${script}" | sed 's/^#! *//'
+}
+nim_pythonpath="$(collect_bundled_pythonpath | paste -sd: -)"
 
-if [[ -x "${bundle_root}/usr/local/bin/python3" ]]; then
-  export PYTHON="${bundle_root}/usr/local/bin/python3"
+ensure_nim_python_deps() {
+  local vendor="${NIM_CACHE_PATH}/.nim_py_vendor"
+  mkdir -p "${vendor}"
+  if PYTHONPATH="${nim_pythonpath}" "${bundled_python}" -c "import wrapt" 2>/dev/null; then
+    return 0
+  fi
+  echo "Installing bundled NIM python dependency: wrapt -> ${vendor}"
+  if ! PYTHONPATH="${nim_pythonpath}" "${bundled_python}" -m pip install \
+    --quiet --no-cache-dir --disable-pip-version-check --target "${vendor}" wrapt; then
+    pip3 install --quiet --no-cache-dir --disable-pip-version-check --target "${vendor}" wrapt
+  fi
+  if [[ -d "${vendor}/wrapt" ]]; then
+    nim_pythonpath="${nim_pythonpath}:${vendor}"
+  fi
+}
+
+nim_ld_library_path="${bundle_root}/usr/local/lib:${bundle_root}/usr/lib/x86_64-linux-gnu"
+if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
+  nim_ld_library_path="${nim_ld_library_path}:${LD_LIBRARY_PATH}"
 fi
 
-export LD_LIBRARY_PATH="${bundle_root}/usr/local/lib:${bundle_root}/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+resolve_bundled_python() {
+  local candidate shebang mapped
+  for script in \
+    "${bundle_root}/opt/nim/start_server.sh" \
+    "${bundle_root}/usr/local/bin/start_server" \
+    "${bundle_root}/start_server"; do
+    shebang="$(read_script_shebang "${script}" 2>/dev/null || true)"
+    if [[ -n "${shebang}" ]]; then
+      mapped="$(map_bundle_path "${shebang}")"
+      if [[ -x "${mapped}" ]]; then
+        echo "${mapped}"
+        return 0
+      fi
+    fi
+  done
+  for candidate in \
+    "${bundle_root}/usr/local/bin/python3.12" \
+    "${bundle_root}/usr/local/bin/python3" \
+    "${bundle_root}/usr/bin/python3.12" \
+    "${bundle_root}/usr/bin/python3"; do
+    if [[ -x "${candidate}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+  if command -v python3.12 >/dev/null 2>&1; then
+    command -v python3.12
+    return 0
+  fi
+  command -v python3
+}
+bundled_python="$(resolve_bundled_python || true)"
+if [[ -z "${bundled_python}" || ! -x "${bundled_python}" ]]; then
+  echo "ERROR: no usable python for bundled NIM" >&2
+  exit 1
+fi
+ensure_nim_python_deps
+
+select_nim_profile() {
+  local cap profile
+  cap="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d ' ' || true)"
+  case "${cap}" in
+    7.5)
+      profile="ae4879839cd92b9ca86791d2455b3ce72261f485f00a89e2056e11c3e69d4bc3"
+      ;;
+    8.6|8.6*)
+      profile="15d466e43b11fa523e0662603f09bce6e5c7fc92fba33ea5c6122b98ec546bd8"
+      ;;
+    8.9|8.9*)
+      profile="6abf19cf36a0d5498b77c466780ac80c8224e641457f4f33a7df694810e2d746"
+      ;;
+    12.0|12.*)
+      profile="3ce493f31eb1718ca928ae45a6995fc585f7571065106db509e7fce4b6f6d3aa"
+      ;;
+    8.*)
+      profile="15d466e43b11fa523e0662603f09bce6e5c7fc92fba33ea5c6122b98ec546bd8"
+      ;;
+    *)
+      profile="ae4879839cd92b9ca86791d2455b3ce72261f485f00a89e2056e11c3e69d4bc3"
+      ;;
+  esac
+  echo "${profile}"
+}
+# Always pin hashed profile ID from GPU (svd_sm_* NGC tags are not valid NIM_MODEL_PROFILE values).
+_nim_profile="$(select_nim_profile)"
+export NIM_MODEL_PROFILE="${_nim_profile}"
+unset NIM_MANIFEST_PROFILE 2>/dev/null || true
+echo "Selected NIM_MODEL_PROFILE=${NIM_MODEL_PROFILE} (compute_cap=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d ' ' || echo unknown))"
+
+workspace_dir="${bundle_root}/opt/nim/workspace"
+mkdir -p "${workspace_dir}" 2>/dev/null || true
+if [[ -w "${bundle_root}/opt/nim" ]]; then
+  mkdir -p "${workspace_dir}"
+fi
 
 cd "${bundle_root}"
 nvidia_entrypoint="$(tr -d '\n' <"${entrypoint_file}")"
@@ -137,16 +266,31 @@ if [[ ! -f "${nvidia_entrypoint}" ]]; then
 fi
 require_access "${nvidia_entrypoint}" read
 
+launch_nim() {
+  local start_script="$1"
+  echo "Launching NIM (sanitized PYTHONPATH): ${nvidia_entrypoint} ${start_script}"
+  echo "  PYTHONPATH=${nim_pythonpath}"
+  echo "  python=${bundled_python}"
+  echo "  NIM_MODEL_PROFILE=${NIM_MODEL_PROFILE}"
+  export PATH="${nim_bin_path}"
+  export PYTHONPATH="${nim_pythonpath}"
+  export NIM_MODEL_PROFILE
+  unset NIM_MANIFEST_PROFILE 2>/dev/null || true
+  export PYTHONNOUSERSITE=1
+  export PYTHON="${bundled_python}"
+  export LD_LIBRARY_PATH="${nim_ld_library_path}"
+  unset PYTHONHOME PYTHONUSERBASE CONDA_PREFIX CONDA_DEFAULT_ENV 2>/dev/null || true
+  exec bash "${nvidia_entrypoint}" "${start_script}"
+}
+
 start_server_file="${bundle_root}/start_server"
 if [[ -f "${start_server_file}" ]]; then
   start_server_script="$(tr -d '\n' <"${start_server_file}")"
-  echo "Launching NIM: ${nvidia_entrypoint} ${start_server_script}"
-  exec bash "${nvidia_entrypoint}" "${start_server_script}"
+  launch_nim "${start_server_script}"
 fi
 
 if [[ -f "${bundle_root}/opt/nim/start_server.sh" ]]; then
-  echo "Launching NIM: ${nvidia_entrypoint} ${bundle_root}/opt/nim/start_server.sh"
-  exec bash "${nvidia_entrypoint}" "${bundle_root}/opt/nim/start_server.sh"
+  launch_nim "${bundle_root}/opt/nim/start_server.sh"
 fi
 
 echo "ERROR: start_server script not found under ${bundle_root}" >&2

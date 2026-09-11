@@ -1,0 +1,70 @@
+"""Shared helpers for all-in-one SVD runtime applications (serverless or bundled)."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+from shutil import which
+
+from cai.lib.cai_common import apply_dotenv_to_os
+from cai.lib.demo_ui import DEMO_DIR, SERVER_JS, demo_ui_ready, missing_demo_ui_message
+from cai.lib.paths import ENDPOINTS_ENV, ensure_cai_dirs
+
+
+def start_runtime_ui() -> int:
+    """Start the Next.js detection UI on CDSW_APP_PORT (foreground)."""
+    ensure_cai_dirs()
+    if ENDPOINTS_ENV.is_file():
+        apply_dotenv_to_os(ENDPOINTS_ENV)
+
+    port = os.environ.get("CDSW_APP_PORT") or os.environ.get("PORT") or "8080"
+    os.environ["PORT"] = str(port)
+    os.environ.setdefault("NODE_ENV", "production")
+    os.environ.setdefault("SVD_APP_ROLE", "runtime")
+    os.environ.setdefault("NEXT_PUBLIC_SVD_APP_ROLE", "runtime")
+
+    if not demo_ui_ready():
+        print(missing_demo_ui_message(), flush=True)
+        return 1
+
+    node = which("node") or "/usr/bin/node"
+    if not Path(node).is_file():
+        print(f"ERROR: node not found (tried {node})", flush=True)
+        return 1
+
+    os.chdir(DEMO_DIR)
+    print(f"Starting SVD runtime UI: {node} {SERVER_JS} on 127.0.0.1:{port}", flush=True)
+    return subprocess.call([node, str(SERVER_JS)])
+
+
+def wire_bundled_runtime_endpoints(*, grpc_port: int = 8001) -> None:
+    """Write local runtime endpoints for bundled NIM in this pod."""
+    from cai.lib.cai_common import write_dotenv_file
+    from cai.lib.deploy_mode import NIMDeployMode
+
+    write_dotenv_file(
+        ENDPOINTS_ENV,
+        {
+            "SVD_SERVER": f"127.0.0.1:{grpc_port}",
+            "NIM_DEPLOY_MODE": NIMDeployMode.BUNDLED.value,
+            "SVD_SSL_MODE": "DISABLED",
+        },
+    )
+
+
+def wire_serverless_runtime_endpoints(config) -> None:
+    """Write local runtime endpoints for serverless NVCF in this pod."""
+    from cai.lib.cai_common import write_dotenv_file
+    from cai.lib.deploy_mode import NIMDeployMode, write_serverless_endpoints_json
+
+    write_serverless_endpoints_json()
+    write_dotenv_file(
+        ENDPOINTS_ENV,
+        {
+            "SVD_SERVER": f"{config.nvidia_serverless_grpc_host}:{config.nvidia_serverless_grpc_port}",
+            "NIM_DEPLOY_MODE": NIMDeployMode.SERVERLESS.value,
+            "SVD_SSL_MODE": "TLS",
+        },
+    )

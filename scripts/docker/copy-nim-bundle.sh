@@ -34,6 +34,14 @@ if [[ -d "${src}/usr/local/bin" ]]; then
     [[ -e "${src}/usr/local/bin/${bin}" ]] && cp -aL "${src}/usr/local/bin/${bin}" "${dest}/usr/local/bin/${bin}" 2>/dev/null || true
   done
 fi
+if [[ -d "${src}/usr/bin" ]]; then
+  for bin in python3 python3.12; do
+    [[ -e "${src}/usr/bin/${bin}" ]] && cp -aL "${src}/usr/bin/${bin}" "${dest}/usr/bin/${bin}" 2>/dev/null || true
+  done
+fi
+for rel in usr/local/lib/python3.12 usr/lib/python3.12; do
+  copy_tree "${rel}"
+done
 
 if ! find "${dest}" -path '*/dist-packages/nimlib' -type d 2>/dev/null | grep -q .; then
   echo "ERROR: nimlib not found under ${dest}" >&2

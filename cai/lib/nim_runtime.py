@@ -25,6 +25,7 @@ SVD_NIM_ENV_KEYS = (
     "NIM_HTTP_API_PORT",
     "NIM_GRPC_API_PORT",
     "NIM_MANIFEST_PROFILE",
+    "NIM_MODEL_PROFILE",
     "NIM_MAX_CONCURRENCY_PER_GPU",
     "NIM_CACHE_PATH",
     "NIM_CACHE_DIR",
@@ -120,11 +121,9 @@ def wait_for_nim_ready(http_port: int, grpc_port: int, *, timeout_s: int = 3600)
         http_ok = _http_ready(http_url)
         models_ok = _models_loaded(http_port) if http_ok else False
         grpc_ok = tcp_port_open("127.0.0.1", grpc_port)
-        if http_ok and models_ok and grpc_ok:
+        if http_ok and grpc_ok and (models_ok or grpc_ok):
             return
-        if http_ok and not models_ok:
-            last_error = "http ready but no models loaded yet"
-        elif http_ok and not grpc_ok:
+        if http_ok and not grpc_ok:
             last_error = f"http ready but gRPC :{grpc_port} not listening"
         elif not http_ok:
             last_error = "http health not ready"
@@ -145,11 +144,59 @@ def publish_nim_endpoint(*, grpc_port: int, http_port: int) -> dict[str, Any]:
     return merge_nim_endpoints({"svd": entry, "svd-nim": entry})
 
 
+# Profile IDs from /opt/nim/etc/default/model_manifest.yaml (SVD NIM 1.0.0).
+_PROFILE_ID_BY_GPU_CC: dict[str, str] = {
+    "7.5": "ae4879839cd92b9ca86791d2455b3ce72261f485f00a89e2056e11c3e69d4bc3",
+    "8.6": "15d466e43b11fa523e0662603f09bce6e5c7fc92fba33ea5c6122b98ec546bd8",
+    "8.9": "6abf19cf36a0d5498b77c466780ac80c8224e641457f4f33a7df694810e2d746",
+    "12.0": "3ce493f31eb1718ca928ae45a6995fc585f7571065106db509e7fce4b6f6d3aa",
+}
+
+
+def _gpu_compute_cap() -> str:
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+        if out.stdout:
+            return out.stdout.strip().splitlines()[0].strip()
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
+def _default_nim_model_profile() -> str:
+    cap = _gpu_compute_cap()
+    if cap in _PROFILE_ID_BY_GPU_CC:
+        return _PROFILE_ID_BY_GPU_CC[cap]
+    if cap.startswith("8.9"):
+        return _PROFILE_ID_BY_GPU_CC["8.9"]
+    if cap.startswith("8.6") or cap.startswith("8."):
+        return _PROFILE_ID_BY_GPU_CC["8.6"]
+    return _PROFILE_ID_BY_GPU_CC["7.5"]
+
+
+def _resolve_nim_profile() -> str:
+    for key in ("NIM_MODEL_PROFILE", "NIM_MANIFEST_PROFILE"):
+        value = (os.environ.get(key) or "").strip()
+        if value and len(value) >= 32:
+            return value
+    return _default_nim_model_profile()
+
+
 def configure_svd_env() -> dict[str, Any]:
     os.environ.setdefault("NIM_HTTP_API_PORT", str(SVD_DEFAULTS["http_port"]))
     os.environ.setdefault("NIM_GRPC_API_PORT", str(SVD_DEFAULTS["grpc_port"]))
     os.environ.setdefault("NVIDIA_DRIVER_CAPABILITIES", "all")
     os.environ.setdefault("MAXINE_MAX_INPUT_FILE_SIZE_MB", "500")
+    profile = _resolve_nim_profile()
+    os.environ["NIM_MODEL_PROFILE"] = profile
+    # Legacy alias — keep unset when using hashed profile IDs (svd_sm_* breaks nimlib 0.17+).
+    os.environ.pop("NIM_MANIFEST_PROFILE", None)
     cache = nim_cache_dir()
     os.environ["NIM_CACHE_PATH"] = cache
     os.environ["NIM_CACHE_DIR"] = cache

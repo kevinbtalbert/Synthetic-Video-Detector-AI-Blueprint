@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -75,6 +75,14 @@ class AppConfig:
             merged[key] = value
         return cls.from_dict(merged)
 
+    @classmethod
+    def for_mode(cls, mode: str | NIMDeployMode, data: dict[str, Any]) -> AppConfig:
+        normalized = normalize_nim_deploy_mode(
+            mode.value if isinstance(mode, NIMDeployMode) else mode
+        ).value
+        payload = {**data, "nim_deploy_mode": normalized}
+        return cls.from_dict(payload)
+
     def secrets_set(self) -> dict[str, bool]:
         return {"ngc_api_key": bool(self.ngc_api_key)}
 
@@ -101,9 +109,11 @@ class AppConfig:
     def app_environment(self) -> dict[str, str]:
         env = self.as_process_env()
         env["TASK_TYPE"] = "START_APPLICATION"
+        env["SVD_APP_ROLE"] = "runtime"
+        env["NIM_DEPLOY_MODE"] = self.nim_deploy_mode
         return env
 
-    def validate_for_build(self) -> dict[str, Any]:
+    def validate_for_deploy(self) -> dict[str, Any]:
         errors: list[str] = []
         warnings: list[str] = []
         mode = normalize_nim_deploy_mode(self.nim_deploy_mode).value
@@ -112,32 +122,102 @@ class AppConfig:
             errors.append(f"Invalid deployment mode: {self.nim_deploy_mode}")
 
         if not self.ngc_api_key.strip():
-            errors.append("NGC API key is required (bundled NIM entitlement and serverless NVCF auth).")
+            errors.append("NGC API key is required.")
 
         if mode == NIMDeployMode.SERVERLESS.value and not self.svd_nvidia_function_id.strip():
-            errors.append("NVCF function ID is required for serverless mode.")
+            errors.append("NVCF function ID is required for serverless deployment.")
 
         if mode == NIMDeployMode.BUNDLED.value:
             warnings.append(
-                "Bundled mode starts a GPU NIM application; first startup can take 15–30+ minutes."
+                "Bundled deployment starts NIM inside the app pod; first startup can take 15–30+ minutes."
             )
         else:
             warnings.append(
-                "Serverless mode uses the NVIDIA Cloud Functions API — evaluation use only, not production."
+                "Serverless deployment uses the NVIDIA Cloud Functions API — evaluation use only."
             )
 
         return {"valid": len(errors) == 0, "errors": errors, "warnings": warnings}
 
+    def validate_for_build(self) -> dict[str, Any]:
+        return self.validate_for_deploy()
 
-def validate_merged_config(patch: dict[str, Any] | None = None) -> dict[str, Any]:
-    existing = load_app_config()
-    config = AppConfig.merge_update(existing, patch or {}) if patch else existing
+
+@dataclass
+class LaunchpadConfig:
+    """Per-mode configuration saved from the Launchpad deploy sections."""
+
+    serverless: AppConfig = field(default_factory=lambda: AppConfig.for_mode("SERVERLESS", {}))
+    bundled: AppConfig = field(default_factory=lambda: AppConfig.for_mode("BUNDLED", {}))
+
+    @classmethod
+    def from_storage(cls, data: dict[str, Any]) -> LaunchpadConfig:
+        if "serverless" in data or "bundled" in data:
+            serverless_raw = data.get("serverless") if isinstance(data.get("serverless"), dict) else {}
+            bundled_raw = data.get("bundled") if isinstance(data.get("bundled"), dict) else {}
+            return cls(
+                serverless=AppConfig.for_mode("SERVERLESS", serverless_raw),
+                bundled=AppConfig.for_mode("BUNDLED", bundled_raw),
+            )
+        # Legacy flat deployment_config.json
+        legacy = AppConfig.from_dict(data)
+        if legacy.nim_deploy_mode == NIMDeployMode.SERVERLESS.value:
+            return cls(serverless=legacy, bundled=AppConfig.for_mode("BUNDLED", {}))
+        return cls(serverless=AppConfig.for_mode("SERVERLESS", {}), bundled=legacy)
+
+    def to_storage(self) -> dict[str, Any]:
+        return {
+            "serverless": self.serverless.to_dict(),
+            "bundled": self.bundled.to_dict(),
+        }
+
+    def config_for(self, mode: str | NIMDeployMode) -> AppConfig:
+        normalized = normalize_nim_deploy_mode(
+            mode.value if isinstance(mode, NIMDeployMode) else mode
+        )
+        if normalized == NIMDeployMode.SERVERLESS:
+            return self.serverless
+        return self.bundled
+
+    def merge_mode(self, mode: str | NIMDeployMode, patch: dict[str, Any]) -> LaunchpadConfig:
+        current = self.config_for(mode)
+        updated = AppConfig.merge_update(current, {**patch, "nim_deploy_mode": current.nim_deploy_mode})
+        if normalize_nim_deploy_mode(mode) == NIMDeployMode.SERVERLESS:
+            return LaunchpadConfig(serverless=updated, bundled=self.bundled)
+        return LaunchpadConfig(serverless=self.serverless, bundled=updated)
+
+    def public_dict(self) -> dict[str, Any]:
+        return {
+            "serverless": self.serverless.public_dict(),
+            "bundled": self.bundled.public_dict(),
+        }
+
+    def secrets_set(self) -> dict[str, dict[str, bool]]:
+        return {
+            "serverless": self.serverless.secrets_set(),
+            "bundled": self.bundled.secrets_set(),
+        }
+
+
+def validate_merged_config(
+    patch: dict[str, Any] | None = None,
+    *,
+    mode: str | None = None,
+) -> dict[str, Any]:
+    launchpad = load_launchpad_config()
+    if launchpad is None and not patch:
+        return {"valid": False, "errors": ["Save configuration before deploying."], "warnings": []}
+    if mode:
+        config = launchpad.config_for(mode) if launchpad else AppConfig.for_mode(mode, patch or {})
+        if patch:
+            config = AppConfig.merge_update(config, patch)
+        return config.validate_for_deploy()
+    config = launchpad.config_for("BUNDLED") if launchpad else None
     if config is None:
-        return {"valid": False, "errors": ["Save your configuration before building."], "warnings": []}
-    return config.validate_for_build()
+        return {"valid": False, "errors": ["Save configuration before deploying."], "warnings": []}
+    return config.validate_for_deploy()
 
 
-def load_app_config() -> AppConfig | None:
+def load_launchpad_config() -> LaunchpadConfig | None:
     if not DEPLOYMENT_CONFIG_JSON.exists():
         return None
     raw = DEPLOYMENT_CONFIG_JSON.read_text().strip()
@@ -149,7 +229,26 @@ def load_app_config() -> AppConfig | None:
         return None
     if not isinstance(data, dict):
         return None
-    return AppConfig.from_dict(data)
+    return LaunchpadConfig.from_storage(data)
+
+
+def load_app_config() -> AppConfig | None:
+    """Return bundled config if set, else serverless — for backward-compatible call sites."""
+    launchpad = load_launchpad_config()
+    if launchpad is None:
+        return None
+    if launchpad.bundled.ngc_api_key:
+        return launchpad.bundled
+    if launchpad.serverless.ngc_api_key:
+        return launchpad.serverless
+    return launchpad.bundled
+
+
+def load_mode_config(mode: str | NIMDeployMode) -> AppConfig | None:
+    launchpad = load_launchpad_config()
+    if launchpad is None:
+        return None
+    return launchpad.config_for(mode)
 
 
 def deployment_config_load_error() -> str | None:
@@ -167,18 +266,39 @@ def deployment_config_load_error() -> str | None:
     return None
 
 
-def save_app_config(config: AppConfig) -> Path:
+def save_launchpad_config(launchpad: LaunchpadConfig) -> Path:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     tmp_path = DEPLOYMENT_CONFIG_JSON.with_suffix(".json.tmp")
-    tmp_path.write_text(json.dumps(config.to_dict(), indent=2) + "\n")
+    tmp_path.write_text(json.dumps(launchpad.to_storage(), indent=2) + "\n")
     tmp_path.replace(DEPLOYMENT_CONFIG_JSON)
-    config.apply_to_environ()
-    write_dotenv_file(APP_ENVIRONMENT_ENV, config.as_process_env())
     return DEPLOYMENT_CONFIG_JSON
 
 
-def apply_persisted_config() -> AppConfig | None:
-    config = load_app_config()
+def save_mode_config(mode: str | NIMDeployMode, config: AppConfig) -> Path:
+    launchpad = load_launchpad_config() or LaunchpadConfig()
+    normalized = normalize_nim_deploy_mode(
+        mode.value if isinstance(mode, NIMDeployMode) else mode
+    )
+    if normalized == NIMDeployMode.SERVERLESS:
+        launchpad = LaunchpadConfig(serverless=config, bundled=launchpad.bundled)
+    else:
+        launchpad = LaunchpadConfig(serverless=launchpad.serverless, bundled=config)
+    path = save_launchpad_config(launchpad)
+    config.apply_to_environ()
+    write_dotenv_file(APP_ENVIRONMENT_ENV, config.as_process_env())
+    return path
+
+
+def save_app_config(config: AppConfig) -> Path:
+    return save_mode_config(config.nim_deploy_mode, config)
+
+
+def apply_persisted_config(*, mode: str | NIMDeployMode | None = None) -> AppConfig | None:
+    if mode is not None:
+        config = load_mode_config(mode)
+    else:
+        role = os.environ.get("NIM_DEPLOY_MODE") or os.environ.get("SVD_DEPLOY_MODE")
+        config = load_mode_config(role) if role else load_app_config()
     if config is None:
         return None
     config.apply_to_environ()

@@ -39,6 +39,8 @@ def main() -> int:
     port = os.environ.get("CDSW_APP_PORT") or os.environ.get("PORT") or "8080"
     os.environ["PORT"] = str(port)
     os.environ.setdefault("NODE_ENV", "production")
+    os.environ.setdefault("SVD_APP_ROLE", "launchpad")
+    os.environ.setdefault("NEXT_PUBLIC_SVD_APP_ROLE", "launchpad")
 
     if not demo_ui_ready():
         print(missing_demo_ui_message(), flush=True)
@@ -52,7 +54,7 @@ def main() -> int:
         return 1
 
     os.chdir(DEMO_DIR)
-    print(f"Starting Launchpad UI: {node} {SERVER_JS} on 127.0.0.1:{port}", flush=True)
+    print(f"Starting Launchpad (deploy control): {node} {SERVER_JS} on 127.0.0.1:{port}", flush=True)
     return subprocess.call([node, str(SERVER_JS)])
 
 

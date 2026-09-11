@@ -56,7 +56,18 @@ function applyDeploymentJson(env: NodeJS.ProcessEnv): void {
   const configPath = deploymentConfigPath();
   if (!fs.existsSync(configPath)) return;
   try {
-    const data = JSON.parse(fs.readFileSync(configPath, "utf8")) as PersistedConfig;
+    const raw = JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
+    const mode = String(env.NIM_DEPLOY_MODE || raw.nim_deploy_mode || "BUNDLED").toUpperCase();
+    let data: PersistedConfig;
+    if (raw.serverless || raw.bundled) {
+      const section =
+        mode === "SERVERLESS"
+          ? (raw.serverless as PersistedConfig)
+          : (raw.bundled as PersistedConfig);
+      data = { ...section, nim_deploy_mode: mode };
+    } else {
+      data = raw as PersistedConfig;
+    }
     for (const [jsonKey, envKey] of Object.entries(ENV_MAP)) {
       const value = data[jsonKey as keyof PersistedConfig];
       if (value) env[envKey] = String(value);
@@ -74,7 +85,8 @@ export function buildDetectProcessEnv(): NodeJS.ProcessEnv {
   applyDeploymentJson(env);
 
   const mode = String(env.NIM_DEPLOY_MODE || "BUNDLED").toUpperCase();
-  if (mode === "SERVERLESS") {
+  const role = String(env.SVD_APP_ROLE || "launchpad");
+  if (mode === "SERVERLESS" && role === "launchpad") {
     const server = String(env.SVD_SERVER || "");
     const host = server.split(":")[0]?.toLowerCase() || "";
     if (host === "127.0.0.1" || host === "localhost") {
@@ -86,16 +98,22 @@ export function buildDetectProcessEnv(): NodeJS.ProcessEnv {
 
 export function validateDetectEnv(env: NodeJS.ProcessEnv): string | null {
   const mode = String(env.NIM_DEPLOY_MODE || "BUNDLED").toUpperCase();
+  const role = String(env.SVD_APP_ROLE || "runtime");
   if (mode === "SERVERLESS") {
     if (!env.NGC_API_KEY?.trim()) {
-      return "NGC API key is not configured. Open Configure, enter your key, save, and build the pipeline.";
+      return "NGC API key is not configured. Save serverless configuration on the Launchpad and redeploy.";
     }
     return null;
   }
   const server = String(env.SVD_SERVER || "");
-  const host = server.split(":")[0]?.toLowerCase() || "";
-  if (!server || host === "127.0.0.1" || host === "localhost") {
-    return "Bundled NIM is not running. Open Configure, build the pipeline, and wait for the GPU application to reach RUNNING.";
+  if (!server) {
+    return "Bundled NIM endpoints are not configured. Wait for the app to finish starting NIM.";
+  }
+  if (role === "launchpad") {
+    const host = server.split(":")[0]?.toLowerCase() || "";
+    if (host === "127.0.0.1" || host === "localhost") {
+      return "Open the deployed Bundled app URL from the Launchpad to run detection.";
+    }
   }
   return null;
 }

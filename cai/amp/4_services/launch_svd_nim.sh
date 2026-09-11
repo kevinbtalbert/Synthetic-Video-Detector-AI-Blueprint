@@ -59,4 +59,6 @@ if [[ ! -x "${launcher}" ]]; then
   echo "ERROR: run-bundled-nim launcher not found or not executable" >&2
   exit 1
 fi
+# Prevent Cloudera/Jupyter PYTHONPATH from leaking into the bundled NIM child process.
+unset PYTHONPATH
 exec "${launcher}" synthetic-video-detector

@@ -1,15 +1,18 @@
-"""Build and manage the Synthetic Video Detector pipeline from the Launchpad."""
+"""Deploy and manage all-in-one SVD applications from the Launchpad."""
 
 from __future__ import annotations
 
 import json
 import time
-from collections.abc import Callable
 from typing import Any
 
-from cai.lib.app_config import AppConfig, load_app_config, save_app_config, validate_merged_config
+from cai.lib.app_config import (
+    AppConfig,
+    LaunchpadConfig,
+    load_launchpad_config,
+    save_mode_config,
+)
 from cai.lib.build_progress import (
-    BUILD_PROGRESS_JSON,
     finish_build_progress,
     is_build_in_progress,
     read_build_progress,
@@ -17,63 +20,57 @@ from cai.lib.build_progress import (
     set_step,
     start_build_progress,
 )
-from cai.lib.cai_common import write_dotenv_file
 from cai.lib.cml_client import ApplicationInfo, CMLClient
-from cai.lib.deploy_mode import (
-    NIMDeployMode,
-    is_bundled_nim_mode,
-    is_serverless_nim_mode,
-    normalize_nim_deploy_mode,
-    write_serverless_endpoints_json,
-)
-from cai.lib.paths import CONFIG_DIR, ENDPOINTS_ENV, NIM_ENDPOINTS_JSON, PROJECT_ROOT, ensure_cai_dirs
+from cai.lib.deploy_mode import NIMDeployMode, normalize_nim_deploy_mode
+from cai.lib.paths import CONFIG_DIR, ENDPOINTS_ENV, NIM_ENDPOINTS_JSON, ensure_cai_dirs
 from cai.lib.subdomains import unique_subdomain
 
 SERVICE_SPECS: dict[str, dict[str, Any]] = {
-    "svd": {
-        "name": "Synthetic Video Detector NIM",
-        "subdomain_base": "svd-nim",
-        "script": "cai/amp/4_services/launch_svd_nim.py",
+    "serverless": {
+        "name": "Synthetic Video Detector (Serverless)",
+        "subdomain_base": "svd-serverless",
+        "script": "cai/amp/5_apps/launch_serverless_app.py",
+        "cpu": 2,
+        "memory": 8,
+        "gpu": 0,
+        "mode": NIMDeployMode.SERVERLESS.value,
+    },
+    "bundled": {
+        "name": "Synthetic Video Detector (Bundled NIM)",
+        "subdomain_base": "svd-bundled",
+        "script": "cai/amp/5_apps/launch_bundled_app.py",
         "cpu": 4,
         "memory": 32,
         "gpu": 1,
-        "deploy_modes": {NIMDeployMode.BUNDLED.value},
+        "mode": NIMDeployMode.BUNDLED.value,
     },
 }
 
+MODE_TO_SPEC_KEY = {
+    NIMDeployMode.SERVERLESS.value: "serverless",
+    NIMDeployMode.BUNDLED.value: "bundled",
+}
 
-def build_plan(config: AppConfig) -> list[dict[str, str]]:
+
+def _spec_key_for_mode(mode: str) -> str:
+    normalized = normalize_nim_deploy_mode(mode).value
+    key = MODE_TO_SPEC_KEY.get(normalized)
+    if not key:
+        raise ValueError(f"Unsupported deploy mode: {mode}")
+    return key
+
+
+def deploy_plan(mode: str) -> list[dict[str, str]]:
+    label = "Serverless" if mode == NIMDeployMode.SERVERLESS.value else "Bundled NIM"
     steps = [
-        {"id": "validate", "label": "Validate configuration"},
+        {"id": "validate", "label": f"Validate {label} configuration"},
         {"id": "save", "label": "Save configuration"},
-        {"id": "cleanup", "label": "Remove applications from the previous deploy mode"},
+        {"id": "deploy", "label": f"Deploy {label} application"},
     ]
-    if config.nim_deploy_mode == NIMDeployMode.BUNDLED.value:
-        steps.append({"id": "svd", "label": "Start Synthetic Video Detector NIM (GPU)"})
-    steps.extend(
-        [
-            {"id": "wire", "label": "Connect detection endpoint (write runtime endpoints)"},
-            {"id": "ready", "label": "Wait until the pipeline is ready to use"},
-        ]
-    )
+    if mode == NIMDeployMode.BUNDLED.value:
+        steps.append({"id": "nim", "label": "Wait for bundled NIM to publish endpoints"})
+    steps.append({"id": "ready", "label": "Deployment ready"})
     return steps
-
-
-def mode_summary(config: AppConfig | None) -> dict[str, str]:
-    if config is None:
-        return {
-            "headline": "Configure your pipeline, then build it from this page.",
-            "detail": "Nothing is deployed until you click Build pipeline.",
-        }
-    if config.nim_deploy_mode == NIMDeployMode.SERVERLESS.value:
-        return {
-            "headline": "Serverless: inference uses the NVIDIA Cloud Functions gRPC API.",
-            "detail": "No local GPU NIM is started. Your NGC API key is used for NVCF authentication.",
-        }
-    return {
-        "headline": "Bundled: Synthetic Video Detector runs as a NVIDIA NIM GPU application.",
-        "detail": "Build creates one GPU application. First startup can take 15–30+ minutes.",
-    }
 
 
 RUNNING_APP_STATUSES = frozenset({"RUNNING", "APPLICATION_RUNNING"})
@@ -95,12 +92,6 @@ def _is_app_failed(status: str | None) -> bool:
     return normalized in FAILED_APP_STATUSES or "FAIL" in normalized
 
 
-def _required_service_keys(config: AppConfig | None) -> list[str]:
-    if config is None or config.nim_deploy_mode == NIMDeployMode.SERVERLESS.value:
-        return []
-    return ["svd"]
-
-
 def _find_app(apps: list[ApplicationInfo], name: str) -> ApplicationInfo | None:
     for app in apps:
         if app.name == name:
@@ -115,11 +106,6 @@ def _wait_for_app_removed(client: CMLClient, name: str, *, timeout_s: int = 180)
             return
         time.sleep(3)
     raise TimeoutError(f"Timed out waiting for application {name!r} to be deleted")
-
-
-def _clear_runtime_endpoint_artifacts() -> None:
-    for path in (ENDPOINTS_ENV, NIM_ENDPOINTS_JSON):
-        path.unlink(missing_ok=True)
 
 
 def _ensure_application(
@@ -158,6 +144,20 @@ def _ensure_application(
     return {"key": spec_key, "name": spec["name"], "application": created.metadata, "created": True}
 
 
+def _wait_for_service_running(spec_key: str, *, timeout_s: int = 900) -> None:
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        status = list_deployment_status()
+        svc = status.get("deployments", {}).get(spec_key, {})
+        app_status = svc.get("application", {}).get("status", "not started")
+        if _is_app_failed(app_status):
+            raise RuntimeError(f"{svc.get('name', spec_key)} failed ({app_status})")
+        if _is_app_running(app_status):
+            return
+        time.sleep(10)
+    raise TimeoutError(f"Timed out waiting for {spec_key} application to reach RUNNING")
+
+
 def _wait_for_nim_endpoints(timeout_s: int = 3600) -> dict[str, Any]:
     deadline = time.time() + timeout_s
     while time.time() < deadline:
@@ -170,152 +170,130 @@ def _wait_for_nim_endpoints(timeout_s: int = 3600) -> dict[str, Any]:
     raise TimeoutError(f"Timed out waiting for SVD endpoint in {NIM_ENDPOINTS_JSON}")
 
 
-def _wire_endpoints(config: AppConfig) -> dict[str, str]:
-    if is_serverless_nim_mode():
-        write_serverless_endpoints_json()
-        host = config.nvidia_serverless_grpc_host
-        port = config.nvidia_serverless_grpc_port
-        endpoints = {
-            "SVD_SERVER": f"{host}:{port}",
-            "NIM_DEPLOY_MODE": NIMDeployMode.SERVERLESS.value,
-            "SVD_SSL_MODE": "TLS",
-        }
-    else:
-        nim_data = _wait_for_nim_endpoints()
-        svd = nim_data.get("svd") or nim_data.get("svd-nim", {})
-        endpoints = {
-            "SVD_SERVER": svd.get("grpc_address", f"{svd.get('host')}:{svd.get('grpc_port')}"),
-            "NIM_DEPLOY_MODE": NIMDeployMode.BUNDLED.value,
-            "SVD_SSL_MODE": "DISABLED",
-        }
-    write_dotenv_file(ENDPOINTS_ENV, endpoints)
-    return endpoints
-
-
-def _wait_for_service_running(service_key: str, *, timeout_s: int = 900) -> None:
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        status = list_deployment_status()
-        svc = status.get("services", {}).get(service_key, {})
-        app = svc.get("application") or {}
-        app_status = app.get("status", "not started")
-        if _is_app_failed(app_status):
-            raise RuntimeError(f"{svc.get('name', service_key)} failed ({app_status})")
-        if _is_app_running(app_status):
-            return
-        time.sleep(10)
-    raise TimeoutError(f"Timed out waiting for {service_key} to reach RUNNING")
-
-
-def build_pipeline(config: AppConfig) -> dict[str, Any]:
+def deploy_application(mode: str, config: AppConfig) -> dict[str, Any]:
+    """Deploy (or redeploy) an all-in-one SVD application for the given mode."""
     ensure_cai_dirs()
+    spec_key = _spec_key_for_mode(mode)
     client = CMLClient()
-    client.configure_project_resources(shared_memory_limit_mb=8192)
-    steps = build_plan(config)
-    start_build_progress(config.nim_deploy_mode, steps)
+    if spec_key == "bundled":
+        client.configure_project_resources(shared_memory_limit_mb=8192)
+
+    steps = deploy_plan(mode)
+    start_build_progress(mode, steps)
     try:
         set_step("validate", "running", message="Validating configuration")
-        validation = config.validate_for_build()
+        validation = config.validate_for_deploy()
         if not validation["valid"]:
             raise RuntimeError("; ".join(validation["errors"]))
         set_step("validate", "done")
 
         set_step("save", "running", message="Saving configuration")
-        save_app_config(config)
+        save_mode_config(mode, config)
         set_step("save", "done")
 
-        set_step("cleanup", "running", message="Cleaning up previous deployment")
-        _clear_runtime_endpoint_artifacts()
-        if is_bundled_nim_mode():
-            for key, spec in SERVICE_SPECS.items():
-                existing = _find_app(client.list_applications(), spec["name"])
-                if existing:
-                    client.delete_application(existing.id)
-                    _wait_for_app_removed(client, spec["name"])
-        set_step("cleanup", "done")
+        set_step("deploy", "running", message="Creating application")
+        apps = client.list_applications()
+        result = _ensure_application(client, spec_key, config, apps, recreate=True)
+        _wait_for_service_running(spec_key)
+        set_step("deploy", "done", detail=result["name"])
 
-        if is_bundled_nim_mode():
-            set_step("svd", "running", message="Starting SVD NIM GPU application")
-            apps = client.list_applications()
-            _ensure_application(client, "svd", config, apps)
-            _wait_for_service_running("svd")
-            set_step("svd", "done")
+        if spec_key == "bundled":
+            set_step("nim", "running", message="Waiting for bundled NIM endpoints")
+            _wait_for_nim_endpoints()
+            set_step("nim", "done")
 
-        set_step("wire", "running", message="Writing runtime endpoints")
-        endpoints = _wire_endpoints(config)
-        set_step("wire", "done")
-
-        set_step("ready", "running", message="Pipeline ready")
+        set_step("ready", "running")
         set_step("ready", "done")
-        finish_build_progress(True, "Pipeline is ready.")
-        return {"success": True, "endpoints": endpoints}
+        finish_build_progress(True, f"{SERVICE_SPECS[spec_key]['name']} deployed.")
+        return {"success": True, "mode": mode, "application": result}
     except Exception as exc:
         finish_build_progress(False, str(exc))
         raise
 
 
+def build_pipeline(config: AppConfig) -> dict[str, Any]:
+    """Backward-compatible alias for deploy_application."""
+    return deploy_application(config.nim_deploy_mode, config)
+
+
+def _deployment_entry(spec_key: str, app: ApplicationInfo | None) -> dict[str, Any]:
+    spec = SERVICE_SPECS[spec_key]
+    app_meta = app.metadata if app else None
+    app_status = (app_meta or {}).get("status", "")
+    endpoints_ready = False
+    if spec_key == "serverless":
+        endpoints_ready = _is_app_running(app_status)
+    elif spec_key == "bundled":
+        endpoints_ready = NIM_ENDPOINTS_JSON.exists() and _is_app_running(app_status)
+
+    return {
+        "key": spec_key,
+        "name": spec["name"],
+        "mode": spec["mode"],
+        "application": app_meta,
+        "app_running": _is_app_running(app_status),
+        "app_failed": _is_app_failed(app_status),
+        "ready": endpoints_ready and _is_app_running(app_status),
+        "subdomain": (app_meta or {}).get("subdomain"),
+    }
+
+
 def list_deployment_status() -> dict[str, Any]:
     ensure_cai_dirs()
-    config = load_app_config()
-    services: dict[str, Any] = {}
+    launchpad = load_launchpad_config()
+    deployments: dict[str, Any] = {}
+    deploy_active = False
+    any_failed = False
     try:
         client = CMLClient()
         apps = client.list_applications()
-        for key, spec in SERVICE_SPECS.items():
+        for spec_key, spec in SERVICE_SPECS.items():
             app = _find_app(apps, spec["name"])
-            services[key] = {
-                "key": key,
-                "name": spec["name"],
-                "application": app.metadata if app else None,
-                "deploy_modes": list(spec["deploy_modes"]),
-            }
+            entry = _deployment_entry(spec_key, app)
+            deployments[spec_key] = entry
+            if entry["app_failed"]:
+                any_failed = True
+            if app and not entry["app_running"] and not entry["app_failed"]:
+                deploy_active = True
     except Exception as exc:
-        services["error"] = str(exc)
+        deployments["error"] = str(exc)
 
-    config_mode = (
-        normalize_nim_deploy_mode(config.nim_deploy_mode)
-        if config
-        else normalize_nim_deploy_mode(None)
-    )
-    serverless = config_mode == NIMDeployMode.SERVERLESS
-
-    endpoints_ready = ENDPOINTS_ENV.exists() and ENDPOINTS_ENV.read_text().strip() != ""
-    required = _required_service_keys(config)
-    running = pending = failed = 0
-    failed_services: list[dict[str, str]] = []
-    for key in required:
-        app = (services.get(key) or {}).get("application") or {}
-        status = app.get("status", "")
-        if _is_app_running(status):
-            running += 1
-        elif _is_app_failed(status):
-            failed += 1
-            failed_services.append({"name": (services.get(key) or {}).get("name", key), "status": status})
-        elif app:
-            pending += 1
-
-    pipeline_ready = endpoints_ready and (
-        serverless or (running == len(required) and failed == 0 and pending == 0)
-    )
     build = reconcile_stale_build(
-        pipeline_failed=failed > 0,
-        failed_services=failed_services,
-        any_deployed_apps=bool(required),
+        pipeline_failed=any_failed,
+        failed_services=[
+            {"name": entry["name"], "status": entry["application"].get("status", "unknown")}
+            for entry in deployments.values()
+            if isinstance(entry, dict) and entry.get("app_failed") and entry.get("application")
+        ],
+        any_deployed_apps=any(
+            isinstance(entry, dict) and entry.get("application") for entry in deployments.values()
+        ),
     ) or read_build_progress()
     build_in_progress = is_build_in_progress()
-    deploy_active = build_in_progress or (bool(required) and pending > 0 and failed == 0)
+    if build_in_progress:
+        deploy_active = True
+
+    active_mode = (build or {}).get("mode")
+    serverless_ready = deployments.get("serverless", {}).get("ready", False)
+    bundled_ready = deployments.get("bundled", {}).get("ready", False)
 
     return {
-        "config": config.public_dict() if config else None,
+        "config": launchpad.public_dict() if launchpad else None,
         "config_error": None,
-        "secrets_set": config.secrets_set() if config else {},
-        "nim_deploy_mode": config.nim_deploy_mode if config else None,
-        "mode_summary": mode_summary(config),
-        "services": services,
-        "pipeline_ready": pipeline_ready,
-        "pipeline_failed": failed > 0,
-        "endpoints_ready": endpoints_ready,
+        "secrets_set": launchpad.secrets_set() if launchpad else {},
+        "deployments": deployments,
+        "services": deployments,
+        "nim_deploy_mode": active_mode,
+        "pipeline_ready": serverless_ready or bundled_ready,
+        "serverless_ready": serverless_ready,
+        "bundled_ready": bundled_ready,
+        "pipeline_failed": any_failed,
+        "endpoints_ready": bundled_ready or serverless_ready,
         "build_in_progress": build_in_progress,
         "build": build,
         "deploy_active": deploy_active,
+        "mode_summary": {
+            "headline": "Launchpad — deploy all-in-one Serverless or Bundled NIM applications.",
+            "detail": "Up to three apps: this Launchpad plus one Serverless and one Bundled runtime app.",
+        },
     }

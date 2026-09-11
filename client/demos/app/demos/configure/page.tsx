@@ -1,16 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import Header from "@/app/components/atoms/Header";
 import Card from "@/app/components/atoms/Card";
 import SecretInput from "@/app/components/atoms/SecretInput";
-import { useDeploymentStatus } from "@/app/hooks/useDeploymentStatus";
+import { useDeploymentStatus, type ServiceStatus } from "@/app/hooks/useDeploymentStatus";
 
-type Mode = "BUNDLED" | "SERVERLESS";
+type DeployMode = "SERVERLESS" | "BUNDLED";
 
-const defaultForm = {
-  nim_deploy_mode: "BUNDLED" as Mode,
+type ModeForm = {
+  ngc_api_key: string;
+  svd_nvidia_function_id: string;
+  nvidia_serverless_grpc_host: string;
+  nvidia_serverless_grpc_port: string;
+  detection_threshold: string;
+};
+
+const defaultServerless: ModeForm = {
   ngc_api_key: "",
   svd_nvidia_function_id: "847b6e53-0133-452d-ab85-d7acf3ace723",
   nvidia_serverless_grpc_host: "grpc.nvcf.nvidia.com",
@@ -18,168 +24,283 @@ const defaultForm = {
   detection_threshold: "0.30",
 };
 
-export default function ConfigurePage() {
-  const { status, refresh, pipelineReady, pipelineFailed, hasPriorBuild } = useDeploymentStatus({
-    pollWhilePending: true,
-  });
-  const [form, setForm] = useState(defaultForm);
-  const [formDirty, setFormDirty] = useState(false);
-  const formHydrated = useRef(false);
-  const [busy, setBusy] = useState(false);
+const defaultBundled: ModeForm = {
+  ngc_api_key: "",
+  svd_nvidia_function_id: "",
+  nvidia_serverless_grpc_host: "",
+  nvidia_serverless_grpc_port: "",
+  detection_threshold: "0.30",
+};
+
+function appUrl(subdomain?: string): string | null {
+  if (!subdomain) return null;
+  if (typeof window === "undefined") return null;
+  const host = window.location.host.replace(/^[^.]+\./, `${subdomain}.`);
+  return `${window.location.protocol}//${host}`;
+}
+
+function DeploySection({
+  mode,
+  title,
+  description,
+  form,
+  onChange,
+  deployment,
+  secretsSet,
+  busy,
+  onSave,
+  onValidate,
+  onDeploy,
+  children,
+}: {
+  mode: DeployMode;
+  title: string;
+  description: string;
+  form: ModeForm;
+  onChange: (patch: Partial<ModeForm>) => void;
+  deployment?: ServiceStatus;
+  secretsSet?: boolean;
+  busy: boolean;
+  onSave: () => void;
+  onValidate: () => void;
+  onDeploy: () => void;
+  children?: React.ReactNode;
+}) {
+  const app = deployment?.application;
+  const status = app?.status || "not deployed";
+  const url = appUrl(app?.subdomain);
+  const ready = Boolean(deployment?.ready);
+  const running = Boolean(deployment?.app_running);
+  const failed = Boolean(deployment?.app_failed);
+
+  return (
+    <Card title={title}>
+      <p className="mb-4 text-sm text-neutral-400">{description}</p>
+      <SecretInput
+        label="NGC API Key"
+        value={form.ngc_api_key}
+        onChange={(v) => onChange({ ngc_api_key: v })}
+        placeholder={secretsSet ? "•••••••• (saved)" : "nvapi-…"}
+      />
+      {children}
+      <label className="mt-4 block text-sm">
+        Detection threshold
+        <input
+          className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2"
+          value={form.detection_threshold}
+          onChange={(e) => onChange({ detection_threshold: e.target.value })}
+        />
+      </label>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <button
+          className="rounded bg-neutral-800 px-4 py-2 hover:bg-neutral-700 disabled:opacity-50"
+          disabled={busy}
+          onClick={onSave}
+        >
+          Save
+        </button>
+        <button
+          className="rounded bg-neutral-800 px-4 py-2 hover:bg-neutral-700 disabled:opacity-50"
+          disabled={busy}
+          onClick={onValidate}
+        >
+          Validate
+        </button>
+        <button
+          className="rounded bg-[var(--nvidia-green)] px-4 py-2 font-medium text-black hover:opacity-90 disabled:opacity-50"
+          disabled={busy}
+          onClick={onDeploy}
+        >
+          {running || ready ? "Redeploy" : "Deploy"}
+        </button>
+      </div>
+      <div className="mt-4 space-y-1 text-sm">
+        <p>
+          Application: <strong>{deployment?.name || title}</strong> —{" "}
+          <span className={failed ? "text-red-400" : ready ? "text-green-400" : "text-neutral-300"}>
+            {status}
+          </span>
+        </p>
+        {url && (
+          <p>
+            Open app:{" "}
+            <a href={url} target="_blank" rel="noreferrer" className="text-[var(--nvidia-green)] underline">
+              {url}
+            </a>
+          </p>
+        )}
+        {ready && url && (
+          <p className="text-green-400">Ready — use the app URL above for Detect and Demo.</p>
+        )}
+        {mode === "BUNDLED" && running && !ready && (
+          <p className="text-amber-400">NIM is starting inside the app (first run can take 15–30+ minutes).</p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+export default function LaunchpadPage() {
+  const { status, refresh, buildInProgress } = useDeploymentStatus({ pollWhilePending: true });
+  const [serverlessForm, setServerlessForm] = useState(defaultServerless);
+  const [bundledForm, setBundledForm] = useState(defaultBundled);
+  const [dirty, setDirty] = useState({ serverless: false, bundled: false });
+  const hydrated = useRef(false);
+  const [busy, setBusy] = useState<DeployMode | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const patchForm = (patch: Partial<typeof defaultForm>) => {
-    setFormDirty(true);
-    setForm((prev) => ({ ...prev, ...patch }));
-  };
-
-  // Load saved config once; do not overwrite while the user is editing (build polling refreshes status).
   useEffect(() => {
-    if (!status?.config || formDirty || formHydrated.current) return;
-    formHydrated.current = true;
-    setForm((prev) => ({
-      ...prev,
-      nim_deploy_mode: (status.config!.nim_deploy_mode as Mode) || prev.nim_deploy_mode,
-      svd_nvidia_function_id: String(status.config!.svd_nvidia_function_id || prev.svd_nvidia_function_id),
-      nvidia_serverless_grpc_host: String(status.config!.nvidia_serverless_grpc_host || prev.nvidia_serverless_grpc_host),
-      nvidia_serverless_grpc_port: String(status.config!.nvidia_serverless_grpc_port || prev.nvidia_serverless_grpc_port),
-      detection_threshold: String(status.config!.detection_threshold || prev.detection_threshold),
-    }));
-  }, [status, formDirty]);
+    if (!status?.config || hydrated.current) return;
+    hydrated.current = true;
+    const sl = status.config.serverless as Record<string, unknown> | undefined;
+    const bd = status.config.bundled as Record<string, unknown> | undefined;
+    if (sl) {
+      setServerlessForm((prev) => ({
+        ...prev,
+        svd_nvidia_function_id: String(sl.svd_nvidia_function_id || prev.svd_nvidia_function_id),
+        nvidia_serverless_grpc_host: String(sl.nvidia_serverless_grpc_host || prev.nvidia_serverless_grpc_host),
+        nvidia_serverless_grpc_port: String(sl.nvidia_serverless_grpc_port || prev.nvidia_serverless_grpc_port),
+        detection_threshold: String(sl.detection_threshold || prev.detection_threshold),
+      }));
+    }
+    if (bd) {
+      setBundledForm((prev) => ({
+        ...prev,
+        detection_threshold: String(bd.detection_threshold || prev.detection_threshold),
+      }));
+    }
+  }, [status]);
 
-  const post = async (action: string) => {
-    setBusy(true);
+  const post = async (mode: DeployMode, action: "save-config" | "validate" | "deploy") => {
+    setBusy(mode);
     setError(null);
     setMessage(null);
+    const config = mode === "SERVERLESS" ? serverlessForm : bundledForm;
     try {
+      if (action === "deploy") {
+        const saveRes = await fetch("/api/deployment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "save-config", mode, config }),
+        });
+        const saveData = await saveRes.json();
+        if (!saveRes.ok) throw new Error(saveData.error || "Save before deploy failed");
+      }
       const res = await fetch("/api/deployment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, config: form }),
+        body: JSON.stringify({ action, mode, config }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || JSON.stringify(data.errors || data));
-      if (action === "build") {
-        setMessage("Build started — polling status…");
-        setFormDirty(false);
+      if (action === "deploy") {
+        setMessage(`${mode} deployment started — polling status…`);
+        setDirty((d) => ({ ...d, [mode.toLowerCase() as "serverless" | "bundled"]: false }));
         void refresh();
       } else if (action === "save-config") {
-        setMessage("Configuration saved.");
-        setFormDirty(false);
-        formHydrated.current = true;
+        setMessage(`${mode} configuration saved.`);
+        setDirty((d) => ({ ...d, [mode.toLowerCase() as "serverless" | "bundled"]: false }));
       } else {
-        setMessage(data.valid ? "Validation passed." : data.errors?.join("; "));
+        setMessage(data.valid ? `${mode} validation passed.` : data.errors?.join("; "));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
+
+  const deployments = status?.deployments || status?.services || {};
+  const slSecrets = status?.secrets_set?.serverless?.ngc_api_key;
+  const bdSecrets = status?.secrets_set?.bundled?.ngc_api_key;
 
   return (
     <div className="min-h-screen">
       <Header />
-      <main className="mx-auto max-w-3xl space-y-6 p-6">
-        <Card title="Deployment mode">
-          <p className="mb-4 text-sm text-neutral-400">{status?.mode_summary?.headline}</p>
-          <div className="flex gap-4 mb-4">
-            {(["BUNDLED", "SERVERLESS"] as Mode[]).map((mode) => (
-              <label key={mode} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  checked={form.nim_deploy_mode === mode}
-                  onChange={() => patchForm({ nim_deploy_mode: mode })}
-                />
-                {mode === "BUNDLED" ? "Bundled NIM (GPU)" : "Serverless NVCF API"}
-              </label>
-            ))}
-          </div>
-          <SecretInput
-            label="NGC API Key"
-            value={form.ngc_api_key}
-            onChange={(v) => patchForm({ ngc_api_key: v })}
-            placeholder={status?.secrets_set?.ngc_api_key ? "•••••••• (saved)" : "nvapi-…"}
-          />
-          {form.nim_deploy_mode === "SERVERLESS" && (
-            <div className="mt-4 grid gap-3">
-              <label className="text-sm">
-                NVCF Function ID
-                <input
-                  className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2"
-                  value={form.svd_nvidia_function_id}
-                  onChange={(e) => patchForm({ svd_nvidia_function_id: e.target.value })}
-                />
-              </label>
-              <label className="text-sm">
-                gRPC Host
-                <input
-                  className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2"
-                  value={form.nvidia_serverless_grpc_host}
-                  onChange={(e) => patchForm({ nvidia_serverless_grpc_host: e.target.value })}
-                />
-              </label>
-            </div>
+      <main className="mx-auto max-w-4xl space-y-6 p-6">
+        <Card title="Launchpad">
+          <p className="text-sm text-neutral-300">{status?.mode_summary?.headline}</p>
+          <p className="mt-2 text-sm text-neutral-500">{status?.mode_summary?.detail}</p>
+          {buildInProgress && (
+            <p className="mt-3 text-sm text-amber-400">
+              Deployment in progress… {status?.build?.message || ""}
+            </p>
           )}
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              className="rounded bg-neutral-800 px-4 py-2 hover:bg-neutral-700 disabled:opacity-50"
-              disabled={busy}
-              onClick={() => void post("save-config")}
-            >
-              Save configuration
-            </button>
-            <button
-              className="rounded bg-neutral-800 px-4 py-2 hover:bg-neutral-700 disabled:opacity-50"
-              disabled={busy}
-              onClick={() => void post("validate")}
-            >
-              Validate
-            </button>
-            <button
-              className="rounded bg-[var(--nvidia-green)] px-4 py-2 font-medium text-black hover:opacity-90 disabled:opacity-50"
-              disabled={busy || status?.build_in_progress}
-              onClick={() => void post("build")}
-            >
-              Build pipeline
-            </button>
-          </div>
-          {message && <p className="mt-4 text-sm text-green-400">{message}</p>}
-          {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+          {status?.build?.error && <p className="mt-2 text-sm text-red-400">{status.build.error}</p>}
+          {message && <p className="mt-3 text-sm text-green-400">{message}</p>}
+          {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
         </Card>
 
-        <Card title="Pipeline status">
-          {status?.deploy_active && (
-            <p className="text-amber-400 mb-2 text-sm">
-              Deployment in progress… {status.build?.message || ""}
-            </p>
-          )}
-          {pipelineReady && (
-            <p className="text-green-400 mb-2">
-              Ready — <Link href="/demos/detect" className="underline">run detection</Link>
-            </p>
-          )}
-          {pipelineFailed && <p className="text-red-400 mb-2">One or more services failed.</p>}
-          {status?.services?.svd?.application && (
-            <p className="text-sm text-neutral-400 mb-2">
-              SVD NIM application:{" "}
-              <strong>{status.services.svd.application.status || "unknown"}</strong>
-            </p>
-          )}
-          {status?.build?.error && (
-            <p className="text-red-400 text-sm mb-2">{status.build.error}</p>
-          )}
-          {status?.build?.steps?.map((step) => (
-            <div key={step.id} className="text-sm py-1">
-              {step.status === "done" ? "✓" : step.status === "running" ? "◌" : "○"} {step.label}
-              {step.detail ? ` — ${step.detail}` : ""}
-            </div>
-          ))}
-          {!hasPriorBuild && !pipelineReady && (
-            <p className="text-neutral-500 text-sm">Save configuration and build the pipeline to begin.</p>
-          )}
-        </Card>
+        <DeploySection
+          mode="SERVERLESS"
+          title="Deploy Serverless (NVCF)"
+          description="Creates an all-in-one CPU application that calls the NVIDIA Cloud Functions gRPC API for inference."
+          form={serverlessForm}
+          onChange={(patch) => {
+            setDirty((d) => ({ ...d, serverless: true }));
+            setServerlessForm((prev) => ({ ...prev, ...patch }));
+          }}
+          deployment={deployments.serverless as ServiceStatus | undefined}
+          secretsSet={slSecrets}
+          busy={busy !== null}
+          onSave={() => void post("SERVERLESS", "save-config")}
+          onValidate={() => void post("SERVERLESS", "validate")}
+          onDeploy={() => void post("SERVERLESS", "deploy")}
+        >
+          <div className="mt-4 grid gap-3">
+            <label className="text-sm">
+              NVCF Function ID
+              <input
+                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2"
+                value={serverlessForm.svd_nvidia_function_id}
+                onChange={(e) => {
+                  setDirty((d) => ({ ...d, serverless: true }));
+                  setServerlessForm((prev) => ({ ...prev, svd_nvidia_function_id: e.target.value }));
+                }}
+              />
+            </label>
+            <label className="text-sm">
+              gRPC Host
+              <input
+                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2"
+                value={serverlessForm.nvidia_serverless_grpc_host}
+                onChange={(e) => {
+                  setDirty((d) => ({ ...d, serverless: true }));
+                  setServerlessForm((prev) => ({ ...prev, nvidia_serverless_grpc_host: e.target.value }));
+                }}
+              />
+            </label>
+            <label className="text-sm">
+              gRPC Port
+              <input
+                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2"
+                value={serverlessForm.nvidia_serverless_grpc_port}
+                onChange={(e) => {
+                  setDirty((d) => ({ ...d, serverless: true }));
+                  setServerlessForm((prev) => ({ ...prev, nvidia_serverless_grpc_port: e.target.value }));
+                }}
+              />
+            </label>
+          </div>
+        </DeploySection>
+
+        <DeploySection
+          mode="BUNDLED"
+          title="Deploy Bundled NIM (GPU)"
+          description="Creates an all-in-one GPU application. Bundled NIM runs inside the same pod as the detection UI."
+          form={bundledForm}
+          onChange={(patch) => {
+            setDirty((d) => ({ ...d, bundled: true }));
+            setBundledForm((prev) => ({ ...prev, ...patch }));
+          }}
+          deployment={deployments.bundled as ServiceStatus | undefined}
+          secretsSet={bdSecrets}
+          busy={busy !== null}
+          onSave={() => void post("BUNDLED", "save-config")}
+          onValidate={() => void post("BUNDLED", "validate")}
+          onDeploy={() => void post("BUNDLED", "deploy")}
+        />
       </main>
     </div>
   );

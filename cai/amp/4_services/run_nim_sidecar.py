@@ -37,6 +37,11 @@ def main() -> int:
     parser.add_argument("--grpc-port", type=int, default=8001)
     parser.add_argument("--http-port", type=int, default=8000)
     parser.add_argument("--app-port", type=int, default=8100)
+    parser.add_argument(
+        "--no-app-port",
+        action="store_true",
+        help="Only publish endpoints; do not bind CDSW_APP_PORT (all-in-one bundled app)",
+    )
     args = parser.parse_args()
 
     def publisher() -> None:
@@ -52,6 +57,10 @@ def main() -> int:
             except Exception as exc:  # noqa: BLE001
                 print(f"Endpoint publish failed (attempt {attempt}): {exc}", flush=True)
                 time.sleep(60)
+
+    if args.no_app_port:
+        publisher()
+        return 0
 
     threading.Thread(target=publisher, daemon=True).start()
     time.sleep(2)

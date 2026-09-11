@@ -7,23 +7,37 @@ export type StepStatus = "pending" | "running" | "done" | "error" | "skipped";
 export type ServiceStatus = {
   key?: string;
   name?: string;
+  mode?: string;
+  ready?: boolean;
+  app_running?: boolean;
+  app_failed?: boolean;
   application?: { status?: string; id?: string; subdomain?: string } | null;
 };
 
 export type DeploymentStatus = {
   pipeline_ready?: boolean;
+  serverless_ready?: boolean;
+  bundled_ready?: boolean;
   pipeline_failed?: boolean;
   build_in_progress?: boolean;
   deploy_active?: boolean;
   nim_deploy_mode?: string;
-  config?: Record<string, unknown>;
-  secrets_set?: { ngc_api_key?: boolean };
+  config?: {
+    serverless?: Record<string, unknown>;
+    bundled?: Record<string, unknown>;
+  };
+  secrets_set?: {
+    serverless?: { ngc_api_key?: boolean };
+    bundled?: { ngc_api_key?: boolean };
+  };
   mode_summary?: { headline?: string; detail?: string };
+  deployments?: Record<string, ServiceStatus>;
   services?: Record<string, ServiceStatus>;
   build?: {
     error?: string;
     message?: string;
     in_progress?: boolean;
+    mode?: string;
     steps?: Array<{ id: string; label: string; status: StepStatus; detail?: string }>;
   };
 };
@@ -64,7 +78,10 @@ export function useDeploymentStatus({ pollWhilePending = false } = {}) {
     fetchError,
     refresh,
     pipelineReady: Boolean(status?.pipeline_ready),
+    serverlessReady: Boolean(status?.serverless_ready),
+    bundledReady: Boolean(status?.bundled_ready),
     pipelineFailed: Boolean(status?.pipeline_failed),
+    buildInProgress: Boolean(status?.build_in_progress),
     hasPriorBuild: Boolean(status?.build?.steps?.some((s) => s.status === "done")),
   };
 }
