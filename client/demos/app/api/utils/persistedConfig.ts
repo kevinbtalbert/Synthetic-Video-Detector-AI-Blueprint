@@ -77,14 +77,51 @@ function applyDeploymentJson(env: NodeJS.ProcessEnv): void {
   }
 }
 
+const BAKED_RUNTIME_KEYS = [
+  "NIM_DEPLOY_MODE",
+  "NGC_API_KEY",
+  "SVD_NVIDIA_FUNCTION_ID",
+  "NVIDIA_SERVERLESS_GRPC_HOST",
+  "NVIDIA_SERVERLESS_GRPC_PORT",
+  "SVD_DETECTION_THRESHOLD",
+  "SVD_APP_ROLE",
+  "SVD_SERVER",
+] as const;
+
+function isLocalServer(server: string): boolean {
+  const host = server.split(":")[0]?.toLowerCase() || "";
+  return host === "127.0.0.1" || host === "localhost" || host === "0.0.0.0";
+}
+
 /** Merge env for detect API. Runtime apps use CML-baked env only; Launchpad reads saved config. */
 export function buildDetectProcessEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
+  const role = String(env.SVD_APP_ROLE || "launchpad").toLowerCase();
+  const baked: Record<string, string | undefined> = {};
+  if (role === "runtime") {
+    for (const key of BAKED_RUNTIME_KEYS) {
+      if (process.env[key]) baked[key] = process.env[key];
+    }
+  }
+
   applyDotenvFile(endpointsEnvPath(), env);
-  const role = String(env.SVD_APP_ROLE || "launchpad");
+
   if (role === "launchpad") {
     applyDotenvFile(appEnvironmentPath(), env);
     applyDeploymentJson(env);
+  } else {
+    for (const [key, value] of Object.entries(baked)) {
+      if (value) env[key] = value;
+    }
+    const mode = String(env.NIM_DEPLOY_MODE || "BUNDLED").toUpperCase();
+    if (mode === "BUNDLED") {
+      env.NIM_DEPLOY_MODE = "BUNDLED";
+      const server = String(env.SVD_SERVER || "");
+      if (!isLocalServer(server)) {
+        env.SVD_SERVER =
+          baked.SVD_SERVER && isLocalServer(baked.SVD_SERVER) ? baked.SVD_SERVER : "127.0.0.1:8001";
+      }
+    }
   }
 
   const mode = String(env.NIM_DEPLOY_MODE || "BUNDLED").toUpperCase();

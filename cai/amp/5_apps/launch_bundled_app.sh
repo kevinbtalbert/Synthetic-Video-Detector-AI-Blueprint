@@ -44,6 +44,17 @@ if [[ -z "${NGC_API_KEY:-}" ]]; then
   exit 1
 fi
 
+python3 - <<'PY'
+import os, sys
+from pathlib import Path
+sys.path.insert(0, str(Path(os.environ.get("CDSW_PROJECT_DIR", "/home/cdsw"))))
+from cai.lib.runtime_app import wire_bundled_runtime_endpoints
+
+grpc_port = int(os.environ.get("NIM_GRPC_API_PORT", "8001"))
+wire_bundled_runtime_endpoints(grpc_port=grpc_port)
+print(f"Wired bundled runtime endpoints to 127.0.0.1:{grpc_port}", flush=True)
+PY
+
 sidecar_log="${project}/cai/config/svd_sidecar.log"
 nohup python3 "${project}/cai/amp/4_services/run_nim_sidecar.py" \
   --grpc-port "${NIM_GRPC_API_PORT}" \

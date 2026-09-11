@@ -86,21 +86,11 @@ def resolve_svd_target() -> tuple[str, bool, tuple[tuple[str, str], ...] | None]
         return f"{host}:{port}", True, nvcf_grpc_metadata(api_key, svd_nvcf_function_id())
 
     endpoint = os.environ.get("SVD_SERVER", "").strip()
-    if endpoint:
-        host, _, port = endpoint.partition(":")
-        port = port or "8001"
-        target = f"{host}:{port}"
-        if is_nvcf_endpoint(host):
-            api_key = os.environ.get("NGC_API_KEY", "").strip()
-            if not api_key:
-                raise RuntimeError("NGC_API_KEY is required for serverless NVCF mode")
-            return target, True, nvcf_grpc_metadata(api_key, svd_nvcf_function_id())
-        return target, False, None
-
-    raise RuntimeError(
-        "Bundled NIM endpoint is not configured. Build the pipeline from Configure, "
-        "or switch to SERVERLESS mode."
-    )
+    if not endpoint or not _local_endpoint(endpoint) or is_nvcf_endpoint(endpoint.partition(":")[0]):
+        endpoint = "127.0.0.1:8001"
+    host, _, port = endpoint.partition(":")
+    port = port or "8001"
+    return f"{host}:{port}", False, None
 
 
 def _video_chunks(video_path: Path) -> Iterator[syntheticvideodetector_pb2.DetectSyntheticVideoRequest]:

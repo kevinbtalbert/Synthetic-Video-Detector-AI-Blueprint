@@ -13,11 +13,23 @@ from cai.lib.demo_ui import DEMO_DIR, SERVER_JS, demo_ui_ready, missing_demo_ui_
 from cai.lib.paths import ENDPOINTS_ENV, ensure_cai_dirs
 
 
+def _local_grpc_host(server: str) -> bool:
+    host = server.split(":")[0].strip().lower() if server else ""
+    return host in {"127.0.0.1", "localhost", "0.0.0.0"}
+
+
 def start_runtime_ui() -> int:
     """Start the Next.js detection UI on CDSW_APP_PORT (foreground)."""
     ensure_cai_dirs()
+    baked_mode = os.environ.get("NIM_DEPLOY_MODE", "BUNDLED")
+    baked_server = os.environ.get("SVD_SERVER", "")
     if ENDPOINTS_ENV.is_file():
         apply_dotenv_to_os(ENDPOINTS_ENV)
+    os.environ["NIM_DEPLOY_MODE"] = baked_mode
+    if baked_mode.upper() == "BUNDLED":
+        server = os.environ.get("SVD_SERVER", "")
+        if not _local_grpc_host(server):
+            os.environ["SVD_SERVER"] = baked_server if _local_grpc_host(baked_server) else "127.0.0.1:8001"
 
     port = os.environ.get("CDSW_APP_PORT") or os.environ.get("PORT") or "8080"
     os.environ["PORT"] = str(port)
