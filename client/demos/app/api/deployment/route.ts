@@ -30,6 +30,13 @@ type DeploymentRequestBody = {
 };
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  if ((process.env.SVD_APP_ROLE || "launchpad").toLowerCase() === "runtime") {
+    return NextResponse.json(
+      { error: "Deploy actions are only available on the Launchpad application." },
+      { status: 403 },
+    );
+  }
+
   const body = (await request.json()) as DeploymentRequestBody;
   const action = body.action ?? "";
   const config = body.config;

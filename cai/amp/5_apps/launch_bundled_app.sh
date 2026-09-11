@@ -24,13 +24,14 @@ python3 - <<'PY'
 import os, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(os.environ.get("CDSW_PROJECT_DIR", "/home/cdsw"))))
-from cai.lib.app_config import apply_persisted_config
+from cai.lib.app_config import AppConfig
 from cai.lib.deploy_mode import NIMDeployMode
 from cai.lib.nim_runtime import configure_svd_env
 
-config = apply_persisted_config(mode=NIMDeployMode.BUNDLED)
-if config is None or not config.ngc_api_key.strip():
-    raise SystemExit("ERROR: bundled configuration or NGC_API_KEY missing — deploy from Launchpad first")
+config = AppConfig.from_environ(mode=NIMDeployMode.BUNDLED)
+config.apply_to_environ()
+if not config.ngc_api_key.strip():
+    raise SystemExit("ERROR: NGC_API_KEY missing — redeploy from Launchpad with bundled configuration")
 cfg = configure_svd_env()
 print(f"Bundled NIM gRPC :{cfg['grpc_port']} HTTP :{cfg['http_port']}", flush=True)
 print(f"Cache: {cfg['cache_dir']}", flush=True)

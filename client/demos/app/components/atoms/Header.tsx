@@ -1,16 +1,15 @@
 import Link from "next/link";
-
-const role = process.env.NEXT_PUBLIC_SVD_APP_ROLE || process.env.SVD_APP_ROLE || "launchpad";
+import { getAppRole } from "@/app/lib/appRole";
 
 export default function Header() {
-  const isLaunchpad = role === "launchpad";
+  const isLaunchpad = getAppRole() === "launchpad";
 
   return (
     <header className="border-b border-neutral-800 px-6 py-4 flex items-center justify-between">
       <div>
         <h1 className="text-xl font-semibold text-[var(--nvidia-green)]">Synthetic Video Detector</h1>
         <p className="text-sm text-neutral-400">
-          {isLaunchpad ? "Launchpad — deploy runtime applications" : "NVIDIA NIM Runtime"}
+          {isLaunchpad ? "Launchpad — generate standalone runtime applications" : "NVIDIA NIM Runtime"}
         </p>
       </div>
       <nav className="flex gap-4 text-sm">

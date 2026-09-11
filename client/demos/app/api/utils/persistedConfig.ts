@@ -77,15 +77,17 @@ function applyDeploymentJson(env: NodeJS.ProcessEnv): void {
   }
 }
 
-/** Merge wired endpoints, saved app env, then deployment_config (user intent wins). */
+/** Merge env for detect API. Runtime apps use CML-baked env only; Launchpad reads saved config. */
 export function buildDetectProcessEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
   applyDotenvFile(endpointsEnvPath(), env);
-  applyDotenvFile(appEnvironmentPath(), env);
-  applyDeploymentJson(env);
+  const role = String(env.SVD_APP_ROLE || "launchpad");
+  if (role === "launchpad") {
+    applyDotenvFile(appEnvironmentPath(), env);
+    applyDeploymentJson(env);
+  }
 
   const mode = String(env.NIM_DEPLOY_MODE || "BUNDLED").toUpperCase();
-  const role = String(env.SVD_APP_ROLE || "launchpad");
   if (mode === "SERVERLESS" && role === "launchpad") {
     const server = String(env.SVD_SERVER || "");
     const host = server.split(":")[0]?.toLowerCase() || "";

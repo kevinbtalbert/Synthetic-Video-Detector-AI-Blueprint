@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Header from "@/app/components/atoms/Header";
+import LaunchpadDeployBanner from "@/app/components/atoms/LaunchpadDeployBanner";
 import Card from "@/app/components/atoms/Card";
 import SampleDetectionPanel, {
   type SampleVideo,
@@ -28,21 +29,12 @@ const SAMPLE_VIDEOS: SampleVideo[] = [
 export default function DemoPage() {
   const { pipelineReady, status } = useDeploymentStatus({});
   const mode = resolveDeployMode(status);
-  const isLaunchpad = (process.env.NEXT_PUBLIC_SVD_APP_ROLE || "launchpad") === "launchpad";
 
   return (
     <div className="min-h-screen">
       <Header />
       <main className="mx-auto max-w-6xl space-y-6 p-6">
-        {!pipelineReady && isLaunchpad && (
-          <p className="rounded border border-amber-800 bg-amber-950/40 px-4 py-3 text-sm">
-            Deploy a runtime app from the{" "}
-            <Link href="/demos/configure" className="underline">
-              Launchpad
-            </Link>{" "}
-            first, then open that app&apos;s URL for demos.
-          </p>
-        )}
+        <LaunchpadDeployBanner pipelineReady={pipelineReady} />
 
         <Card title="Demo">
           <p className="mb-6 text-sm text-neutral-400">

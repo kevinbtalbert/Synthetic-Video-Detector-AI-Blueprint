@@ -220,7 +220,10 @@ export default function LaunchpadPage() {
       <Header />
       <main className="mx-auto max-w-4xl space-y-6 p-6">
         <Card title="Launchpad">
-          <p className="text-sm text-neutral-300">{status?.mode_summary?.headline}</p>
+          <p className="text-sm text-neutral-300">
+            Configure and generate standalone runtime applications. Each deploy creates a new CML app
+            with your settings baked in as environment variables — no configure step in the runtime app.
+          </p>
           <p className="mt-2 text-sm text-neutral-500">{status?.mode_summary?.detail}</p>
           {buildInProgress && (
             <p className="mt-3 text-sm text-amber-400">

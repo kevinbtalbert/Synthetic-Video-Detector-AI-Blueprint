@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(os.environ.get("CDSW_PROJECT_DIR", "/home/cdsw"))))
 
 from cai.lib.amp_runtime import run_amp_entry  # noqa: E402
-from cai.lib.app_config import apply_persisted_config  # noqa: E402
+from cai.lib.app_config import AppConfig  # noqa: E402
 from cai.lib.deploy_mode import NIMDeployMode  # noqa: E402
 from cai.lib.paths import ensure_cai_dirs  # noqa: E402
 from cai.lib.runtime_app import start_runtime_ui, wire_serverless_runtime_endpoints  # noqa: E402
@@ -24,10 +24,8 @@ def main() -> int:
     ensure_cai_dirs()
     os.environ["NIM_DEPLOY_MODE"] = NIMDeployMode.SERVERLESS.value
 
-    config = apply_persisted_config(mode=NIMDeployMode.SERVERLESS)
-    if config is None:
-        print("ERROR: No serverless configuration saved — deploy from the Launchpad first.", flush=True)
-        return 1
+    config = AppConfig.from_environ(mode=NIMDeployMode.SERVERLESS)
+    config.apply_to_environ()
     if not config.ngc_api_key.strip():
         print("ERROR: NGC_API_KEY is empty", flush=True)
         return 1

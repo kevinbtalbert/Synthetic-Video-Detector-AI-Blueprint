@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import Link from "next/link";
 import { useDropzone } from "react-dropzone";
 import Header from "@/app/components/atoms/Header";
+import LaunchpadDeployBanner from "@/app/components/atoms/LaunchpadDeployBanner";
 import Card from "@/app/components/atoms/Card";
 import DetectionProgress from "@/app/components/atoms/DetectionProgress";
 import DetectionResultSummary from "@/app/components/atoms/DetectionResultSummary";
@@ -41,15 +41,7 @@ export default function DetectPage() {
     <div className="min-h-screen">
       <Header />
       <main className="mx-auto max-w-4xl space-y-6 p-6">
-        {!pipelineReady && (process.env.NEXT_PUBLIC_SVD_APP_ROLE || "launchpad") === "launchpad" && (
-          <p className="rounded border border-amber-800 bg-amber-950/40 px-4 py-3 text-sm">
-            Deploy a runtime application from the{" "}
-            <Link href="/demos/configure" className="underline">
-              Launchpad
-            </Link>{" "}
-            first, then open that app&apos;s URL to run detection.
-          </p>
-        )}
+        <LaunchpadDeployBanner pipelineReady={pipelineReady} />
 
         <Card title="Upload video">
           <p className="text-sm text-neutral-400 mb-4">

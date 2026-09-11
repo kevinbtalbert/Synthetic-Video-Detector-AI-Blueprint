@@ -39,6 +39,26 @@ class AppConfig:
     detection_threshold: str = "0.30"
 
     @classmethod
+    def from_environ(cls, *, mode: str | NIMDeployMode | None = None) -> AppConfig:
+        """Build config from CML application environment (standalone runtime apps)."""
+        resolved_mode = normalize_nim_deploy_mode(
+            mode.value if isinstance(mode, NIMDeployMode) else (mode or os.environ.get("NIM_DEPLOY_MODE", "BUNDLED"))
+        ).value
+        return cls(
+            nim_deploy_mode=resolved_mode,
+            ngc_api_key=str(os.environ.get("NGC_API_KEY", "")),
+            svd_nvidia_function_id=str(
+                os.environ.get("SVD_NVIDIA_FUNCTION_ID") or DEFAULT_SVD_NVCF_FUNCTION_ID
+            ),
+            nvidia_serverless_grpc_host=str(
+                os.environ.get("NVIDIA_SERVERLESS_GRPC_HOST", "grpc.nvcf.nvidia.com")
+            ),
+            nvidia_serverless_grpc_port=str(os.environ.get("NVIDIA_SERVERLESS_GRPC_PORT", "443")),
+            svd_nim_manifest_profile=str(os.environ.get("NIM_MANIFEST_PROFILE", "")),
+            detection_threshold=str(os.environ.get("SVD_DETECTION_THRESHOLD", "0.30")),
+        )
+
+    @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AppConfig:
         mode = normalize_nim_deploy_mode(str(data.get("nim_deploy_mode", "BUNDLED"))).value
         return cls(
@@ -107,10 +127,13 @@ class AppConfig:
         return env
 
     def app_environment(self) -> dict[str, str]:
+        """Env vars baked into a generated standalone CML application."""
         env = self.as_process_env()
         env["TASK_TYPE"] = "START_APPLICATION"
         env["SVD_APP_ROLE"] = "runtime"
+        env["NEXT_PUBLIC_SVD_APP_ROLE"] = "runtime"
         env["NIM_DEPLOY_MODE"] = self.nim_deploy_mode
+        env["NEXT_PUBLIC_NIM_DEPLOY_MODE"] = self.nim_deploy_mode
         return env
 
     def validate_for_deploy(self) -> dict[str, Any]:

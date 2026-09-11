@@ -293,7 +293,7 @@ def list_deployment_status() -> dict[str, Any]:
         "build": build,
         "deploy_active": deploy_active,
         "mode_summary": {
-            "headline": "Launchpad — deploy all-in-one Serverless or Bundled NIM applications.",
-            "detail": "Up to three apps: this Launchpad plus one Serverless and one Bundled runtime app.",
+            "headline": "Launchpad — generate standalone Serverless or Bundled runtime applications.",
+            "detail": "This app only configures and deploys. Open each generated app URL for Detect and Demo.",
         },
     }
