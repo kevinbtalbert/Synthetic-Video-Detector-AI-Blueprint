@@ -68,10 +68,11 @@ function DeploySection({
 }) {
   const app = deployment?.application;
   const status = app?.status || "not deployed";
-  const url = appUrl(app?.subdomain);
   const ready = Boolean(deployment?.ready);
   const running = Boolean(deployment?.app_running);
   const failed = Boolean(deployment?.app_failed);
+  const url = running ? appUrl(app?.subdomain) : null;
+  const starting = Boolean(app?.subdomain) && !running && !failed;
 
   return (
     <Card title={title}>
@@ -121,6 +122,9 @@ function DeploySection({
             {status}
           </span>
         </p>
+        {starting && (
+          <p className="text-amber-400">Application is starting — the app URL will appear when it is online.</p>
+        )}
         {url && (
           <p>
             Open app:{" "}

@@ -77,10 +77,23 @@ export function useDeploymentStatus({ pollWhilePending = false } = {}) {
 
   useEffect(() => {
     if (!pollWhilePending) return;
-    if (!status?.deploy_active && !status?.build_in_progress) return;
+    const awaitingOnline = Object.values(status?.deployments || status?.services || {}).some(
+      (entry) =>
+        entry?.application &&
+        !entry.app_running &&
+        !entry.app_failed,
+    );
+    if (!status?.deploy_active && !status?.build_in_progress && !awaitingOnline) return;
     const id = setInterval(() => void refresh(), 4000);
     return () => clearInterval(id);
-  }, [pollWhilePending, refresh, status?.deploy_active, status?.build_in_progress]);
+  }, [
+    pollWhilePending,
+    refresh,
+    status?.deploy_active,
+    status?.build_in_progress,
+    status?.deployments,
+    status?.services,
+  ]);
 
   return {
     status,
