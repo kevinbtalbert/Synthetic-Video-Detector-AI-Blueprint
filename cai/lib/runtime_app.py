@@ -24,6 +24,8 @@ def start_runtime_ui() -> int:
     os.environ.setdefault("NODE_ENV", "production")
     os.environ.setdefault("SVD_APP_ROLE", "runtime")
     os.environ.setdefault("NEXT_PUBLIC_SVD_APP_ROLE", "runtime")
+    mode = os.environ.get("NIM_DEPLOY_MODE", "BUNDLED")
+    os.environ.setdefault("NEXT_PUBLIC_NIM_DEPLOY_MODE", mode)
 
     if not demo_ui_ready():
         print(missing_demo_ui_message(), flush=True)

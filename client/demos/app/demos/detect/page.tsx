@@ -8,7 +8,7 @@ import Card from "@/app/components/atoms/Card";
 import DetectionProgress from "@/app/components/atoms/DetectionProgress";
 import DetectionResultSummary from "@/app/components/atoms/DetectionResultSummary";
 import { useVideoDetection } from "@/app/hooks/useVideoDetection";
-import { useDeploymentStatus } from "@/app/hooks/useDeploymentStatus";
+import { resolveDeployMode, useDeploymentStatus } from "@/app/hooks/useDeploymentStatus";
 
 export default function DetectPage() {
   const { pipelineReady, status } = useDeploymentStatus({});
@@ -35,7 +35,7 @@ export default function DetectPage() {
     disabled: detection.busy,
   });
 
-  const mode = status?.nim_deploy_mode || status?.config?.nim_deploy_mode || "unknown";
+  const mode = resolveDeployMode(status);
 
   return (
     <div className="min-h-screen">

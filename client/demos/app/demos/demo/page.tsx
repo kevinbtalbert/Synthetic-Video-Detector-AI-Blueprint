@@ -6,7 +6,7 @@ import Card from "@/app/components/atoms/Card";
 import SampleDetectionPanel, {
   type SampleVideo,
 } from "@/app/components/atoms/SampleDetectionPanel";
-import { useDeploymentStatus } from "@/app/hooks/useDeploymentStatus";
+import { resolveDeployMode, useDeploymentStatus } from "@/app/hooks/useDeploymentStatus";
 
 const SAMPLE_VIDEOS: SampleVideo[] = [
   {
@@ -27,19 +27,20 @@ const SAMPLE_VIDEOS: SampleVideo[] = [
 
 export default function DemoPage() {
   const { pipelineReady, status } = useDeploymentStatus({});
-  const mode = status?.nim_deploy_mode || status?.config?.nim_deploy_mode || "unknown";
+  const mode = resolveDeployMode(status);
+  const isLaunchpad = (process.env.NEXT_PUBLIC_SVD_APP_ROLE || "launchpad") === "launchpad";
 
   return (
     <div className="min-h-screen">
       <Header />
       <main className="mx-auto max-w-6xl space-y-6 p-6">
-        {!pipelineReady && (
+        {!pipelineReady && isLaunchpad && (
           <p className="rounded border border-amber-800 bg-amber-950/40 px-4 py-3 text-sm">
-            Pipeline not ready —{" "}
+            Deploy a runtime app from the{" "}
             <Link href="/demos/configure" className="underline">
-              configure and build
+              Launchpad
             </Link>{" "}
-            first.
+            first, then open that app&apos;s URL for demos.
           </p>
         )}
 

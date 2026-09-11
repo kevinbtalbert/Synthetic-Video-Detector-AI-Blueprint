@@ -42,6 +42,16 @@ export type DeploymentStatus = {
   };
 };
 
+/** Resolve active deploy mode from status API or runtime env (all-in-one apps). */
+export function resolveDeployMode(status: DeploymentStatus | null): string {
+  if (status?.nim_deploy_mode) return status.nim_deploy_mode;
+  if (status?.bundled_ready) return "BUNDLED";
+  if (status?.serverless_ready) return "SERVERLESS";
+  const fromEnv = process.env.NEXT_PUBLIC_NIM_DEPLOY_MODE || process.env.NIM_DEPLOY_MODE;
+  if (fromEnv) return fromEnv;
+  return "unknown";
+}
+
 export function useDeploymentStatus({ pollWhilePending = false } = {}) {
   const [status, setStatus] = useState<DeploymentStatus | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
