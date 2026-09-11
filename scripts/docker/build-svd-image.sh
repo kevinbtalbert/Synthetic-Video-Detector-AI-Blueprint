@@ -7,7 +7,7 @@ cd "${root}"
 
 source "${root}/scripts/docker/nim-gpu-arch.sh"
 
-VERSION="${SVD_RUNTIME_VERSION:-1.3}"
+VERSION="${SVD_RUNTIME_VERSION:-1.4}"
 REPO="${SVD_RUNTIME_REPO:-synthetic-video-detector}"
 REGISTRY="${SVD_RUNTIME_REGISTRY:-}"
 
@@ -24,7 +24,10 @@ fi
 arch="$(nim_read_gpu_arch "${root}/build/nim-model-cache" "${NIM_PREFETCH_GPU:-all}")"
 tags=("${REPO}:${VERSION}")
 [[ "${arch}" != "unknown" ]] && tags+=("${REPO}:${VERSION}-${arch}")
-[[ -n "${REGISTRY}" ]] && tags+=("${REGISTRY}:${VERSION}-${arch}")
+if [[ -n "${REGISTRY}" ]]; then
+  tags+=("${REGISTRY}/${REPO}:${VERSION}")
+  [[ "${arch}" != "unknown" ]] && tags+=("${REGISTRY}/${REPO}:${VERSION}-${arch}")
+fi
 
 build_args=(docker build --platform linux/amd64)
 for tag in "${tags[@]}"; do
