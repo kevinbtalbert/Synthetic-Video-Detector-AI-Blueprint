@@ -134,9 +134,13 @@ def _nim_log_has_fatal_error() -> str | None:
             return "NIM bootstrap failed installing python deps (pip --user vs --target conflict)"
         if "TypeError: 'NoneType' object is not callable" in stripped:
             return (
-                "NIM gRPC servicer failed to register (inference module not loaded). "
-                "See cai/config/svd_nim.log and redeploy with the latest run-bundled-nim.sh."
+                "NIM gRPC bootstrap failed (set NIM_DISABLE_GRPC_STARTUP=1 and ensure "
+                "/opt/synthetic-detector is present). See cai/config/svd_nim.log."
             )
+        if "start_service.sh" in stripped or (
+            "synthetic-detector" in stripped and "No such file" in stripped
+        ):
+            return "NIM gRPC service script missing — rebuild SyntheticVideoDetector 1.5.1+ runtime image."
         if "service_class(logger=" in stripped or "GrpcNIMApiInterface" in stripped:
             return "NIM gRPC server failed to start — see cai/config/svd_nim.log"
     return None

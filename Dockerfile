@@ -56,13 +56,20 @@ RUN bash /tmp/install-nim-runtime-stubs.sh && \
     chown -R cdsw:cdsw ${APP_ROOT} /var/lib/synthetic-video-detector
 
 COPY cai/runtime/scripts/run-bundled-nim.sh /usr/local/bin/run-bundled-nim
-# nimlib expects /opt/nim — symlink bundled opt/nim for cdsw (non-root runtime user).
-RUN ln -sf "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/nim" /opt/nim && \
-    mkdir -p "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/nim/workspace" && \
-    chown -R cdsw:cdsw /opt/nim "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/nim/workspace" && \
-    chmod u=rwx,go=rx "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/nim/workspace" && \
-    chown cdsw:cdsw /usr/local/bin/run-bundled-nim && \
-    chmod u=rwx,go=rx /usr/local/bin/run-bundled-nim && \
+COPY cai/runtime/scripts/prepare-bundled-nim-models.sh /usr/local/bin/prepare-bundled-nim-models
+# NIM expects /opt/nim, /opt/tritonserver, /opt/synthetic-detector, and /config (→ .config-root).
+RUN mkdir -p /opt/nim \
+             /opt/nim/.config-root/models/synthetic-video-detector \
+             /opt/nim/workspace \
+             /var/lib/synthetic-video-detector/models && \
+    ln -sfn /opt/nim/.config-root /config && \
+    ln -sfn "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/tritonserver" /opt/tritonserver && \
+    ln -sfn "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/synthetic-detector" /opt/synthetic-detector && \
+    chown -R cdsw:cdsw /opt/nim /opt/tritonserver /opt/synthetic-detector \
+      "${NIM_BUNDLE_ROOT}/synthetic-video-detector" && \
+    chown cdsw:cdsw /usr/local/bin/run-bundled-nim /usr/local/bin/prepare-bundled-nim-models && \
+    chmod u=rwx,go=rx /usr/local/bin/run-bundled-nim /usr/local/bin/prepare-bundled-nim-models && \
+    test -x "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/synthetic-detector/src/grpc/start_service.sh" && \
     if [ -x "${NIM_BUNDLE_ROOT}/synthetic-video-detector/usr/local/bin/python3.12" ]; then \
       "${NIM_BUNDLE_ROOT}/synthetic-video-detector/usr/local/bin/python3.12" -m pip install \
         --no-cache-dir --disable-pip-version-check --no-user --isolated --break-system-packages \
@@ -79,7 +86,7 @@ ENV ML_RUNTIME_EDITION="SyntheticVideoDetector" \
     ML_RUNTIME_EDITOR="JupyterLab" \
     ML_RUNTIME_KERNEL="Python 3.13" \
     ML_RUNTIME_SHORT_VERSION="1.5" \
-    ML_RUNTIME_MAINTENANCE_VERSION="0" \
+    ML_RUNTIME_MAINTENANCE_VERSION="1" \
     ML_RUNTIME_DESCRIPTION="JupyterLab Runtime with NVIDIA Synthetic Video Detector NIM"
 
 ENV ML_RUNTIME_FULL_VERSION="${ML_RUNTIME_SHORT_VERSION}.${ML_RUNTIME_MAINTENANCE_VERSION}"

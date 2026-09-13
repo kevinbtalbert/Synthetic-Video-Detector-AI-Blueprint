@@ -28,7 +28,8 @@ Integration glue that remains (build-time, not runtime one-offs):
 | Piece | Why |
 |-------|-----|
 | `copy-nim-bundle.sh` | NIM filesystem lives under `/opt/nvidia-nim/...` inside Cloudera base image |
-| `run-bundled-nim.sh` | Isolates NIM Python from Cloudera `PYTHONPATH`; execs stock entrypoint |
+| `run-bundled-nim.sh` | Restores NGC image env; links `/opt/synthetic-detector`; execs stock entrypoint |
+| `prepare-bundled-nim-models.sh` | Wires TensorRT `.trt` engines into `/opt/nim/workspace` |
 | `deviceQuery` stub | Baked in image — CAI has `nvidia-smi` but not CUDA samples |
 | `wrapt` in image | Bundled Python dep, installed at Docker build |
 
