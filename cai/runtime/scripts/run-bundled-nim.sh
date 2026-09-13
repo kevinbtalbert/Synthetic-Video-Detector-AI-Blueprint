@@ -165,17 +165,26 @@ nim_pythonpath="$(collect_bundled_pythonpath | paste -sd: -)"
 ensure_nim_python_deps() {
   local vendor="${NIM_CACHE_PATH}/.nim_py_vendor"
   mkdir -p "${vendor}"
-  if PYTHONPATH="${nim_pythonpath}" "${bundled_python}" -c "import wrapt" 2>/dev/null; then
+  if PYTHONPATH="${nim_pythonpath}:${vendor}" "${bundled_python}" -c "import wrapt" 2>/dev/null; then
+    nim_pythonpath="${nim_pythonpath}:${vendor}"
     return 0
   fi
   echo "Installing bundled NIM python dependency: wrapt -> ${vendor}"
-  if ! PYTHONPATH="${nim_pythonpath}" "${bundled_python}" -m pip install \
-    --quiet --no-cache-dir --disable-pip-version-check --target "${vendor}" wrapt; then
-    pip3 install --quiet --no-cache-dir --disable-pip-version-check --target "${vendor}" wrapt
+  # pip rejects --user together with --target; force an isolated vendor install.
+  if ! env PIP_USER=0 PIP_BREAK_SYSTEM_PACKAGES=1 PYTHONNOUSERSITE=1 \
+    PYTHONPATH="${nim_pythonpath}" "${bundled_python}" -m pip install \
+      --quiet --no-cache-dir --disable-pip-version-check \
+      --no-user --isolated --break-system-packages \
+      --target "${vendor}" wrapt; then
+    echo "ERROR: failed to install wrapt into ${vendor}" >&2
+    exit 1
   fi
-  if [[ -d "${vendor}/wrapt" ]]; then
-    nim_pythonpath="${nim_pythonpath}:${vendor}"
+  if ! PYTHONPATH="${nim_pythonpath}:${vendor}" "${bundled_python}" -c "import wrapt"; then
+    echo "ERROR: wrapt install did not produce an importable module under ${vendor}" >&2
+    exit 1
   fi
+  nim_pythonpath="${nim_pythonpath}:${vendor}"
+  echo "wrapt installed successfully"
 }
 
 nim_ld_library_path="${bundle_root}/usr/local/lib:${bundle_root}/usr/lib/x86_64-linux-gnu"

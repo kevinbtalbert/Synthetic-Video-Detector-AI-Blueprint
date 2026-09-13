@@ -58,8 +58,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
         const encoder = new TextEncoder();
+        let closed = false;
+
+        const safeClose = () => {
+          if (closed) return;
+          closed = true;
+          try {
+            controller.close();
+          } catch {
+            /* already closed */
+          }
+        };
+
         const emit = (event: Record<string, unknown>) => {
-          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+          if (closed) return;
+          try {
+            controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+          } catch {
+            closed = true;
+          }
         };
 
         emit({ type: "phase", phase: "uploading", message: "Video received, starting detection…" });
@@ -97,7 +114,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             }
             if (code !== 0) {
               emit({ type: "error", error: stderr.trim() || "Detection failed" });
-              controller.close();
               return;
             }
             const result = JSON.parse(await fs.readFile(jsonPath, "utf8")) as DetectPayload;
@@ -109,8 +125,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             });
           } finally {
             await fs.rm(tmpDir, { recursive: true, force: true });
-            controller.close();
+            safeClose();
           }
+        });
+
+        proc.on("error", async (err) => {
+          emit({ type: "error", error: err.message });
+          await fs.rm(tmpDir, { recursive: true, force: true });
+          safeClose();
         });
       },
     });

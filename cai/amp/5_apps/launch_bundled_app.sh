@@ -139,12 +139,28 @@ PY
 fi
 
 nim_log="${project}/cai/config/svd_nim.log"
+: >"${nim_log}"
 echo "[startup] Launching bundled NIM via ${launcher} (logs: ${nim_log})"
 (
   unset PYTHONPATH
   exec "${launcher}" synthetic-video-detector
 ) >>"${nim_log}" 2>&1 &
-echo "[startup] NIM process pid $!"
+nim_pid=$!
+echo "[startup] NIM process pid ${nim_pid}"
+sleep 3
+if ! kill -0 "${nim_pid}" 2>/dev/null; then
+  echo "[startup] ERROR: NIM process exited immediately — see ${nim_log}" >&2
+  tail -20 "${nim_log}" >&2 || true
+  python3 - <<'PY'
+import sys
+from pathlib import Path
+import os
+sys.path.insert(0, str(Path(os.environ.get("CDSW_PROJECT_DIR", "/home/cdsw"))))
+from cai.lib.nim_startup import mark_nim_startup_error
+mark_nim_startup_error("NIM process exited immediately — see cai/config/svd_nim.log")
+PY
+  exit 1
+fi
 
 python3 - <<'PY'
 import sys

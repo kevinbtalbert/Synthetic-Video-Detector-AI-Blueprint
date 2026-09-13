@@ -112,6 +112,29 @@ def _models_loaded(http_port: int) -> bool:
         return False
 
 
+def _nim_log_has_fatal_error() -> str | None:
+    log_path = PROJECT_ROOT / "cai" / "config" / "svd_nim.log"
+    if not log_path.is_file():
+        return None
+    try:
+        tail = log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
+    except OSError:
+        return None
+    for line in reversed(tail):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if "ERROR: failed to install wrapt" in stripped:
+            return stripped
+        if "ERROR: wrapt install" in stripped:
+            return stripped
+        if stripped.startswith("ERROR:"):
+            return stripped
+        if "Can not combine '--user' and '--target'" in stripped:
+            return "NIM bootstrap failed installing python deps (pip --user vs --target conflict)"
+    return None
+
+
 def wait_for_nim_ready(http_port: int, grpc_port: int, *, timeout_s: int = 3600) -> None:
     """Wait until Triton HTTP is ready, at least one model is loaded, and gRPC is listening."""
     from cai.lib.nim_startup import mark_nim_startup_error, update_nim_startup
@@ -120,8 +143,14 @@ def wait_for_nim_ready(http_port: int, grpc_port: int, *, timeout_s: int = 3600)
     http_url = f"http://127.0.0.1:{http_port}/v1/health/ready"
     last_error = ""
     poll = 0
+    grpc_stall_polls = 0
     while time.time() < deadline:
         poll += 1
+        log_error = _nim_log_has_fatal_error()
+        if log_error:
+            mark_nim_startup_error(log_error)
+            raise RuntimeError(log_error)
+
         http_ok = _http_ready(http_url)
         models_ok = _models_loaded(http_port) if http_ok else False
         grpc_ok = tcp_port_open("127.0.0.1", grpc_port)
@@ -130,7 +159,7 @@ def wait_for_nim_ready(http_port: int, grpc_port: int, *, timeout_s: int = 3600)
             "grpc_ready": grpc_ok,
             "models_loaded": models_ok,
         }
-        if http_ok and grpc_ok and (models_ok or grpc_ok):
+        if http_ok and grpc_ok and models_ok:
             update_nim_startup(
                 "ready",
                 f"NIM is ready (HTTP :{http_port}, gRPC :{grpc_port})",
@@ -142,14 +171,25 @@ def wait_for_nim_ready(http_port: int, grpc_port: int, *, timeout_s: int = 3600)
             phase = "waiting_http"
             message = f"Waiting for NIM HTTP health on :{http_port} (poll #{poll})…"
             last_error = "http health not ready"
+            grpc_stall_polls = 0
         elif not grpc_ok:
+            grpc_stall_polls += 1
             phase = "waiting_grpc"
-            message = f"HTTP ready — waiting for gRPC on :{grpc_port} (poll #{poll})…"
+            message = (
+                f"HTTP ready — waiting for gRPC on :{grpc_port} (poll #{poll})… "
+                "Check cai/config/svd_nim.log if this persists."
+            )
             last_error = f"http ready but gRPC :{grpc_port} not listening"
+            if grpc_stall_polls >= 12:
+                log_error = _nim_log_has_fatal_error()
+                if log_error:
+                    mark_nim_startup_error(log_error)
+                    raise RuntimeError(log_error)
         else:
             phase = "loading_models"
             message = f"Waiting for models to load (poll #{poll}; first run can take 15–30+ min)…"
             last_error = "models not loaded yet"
+            grpc_stall_polls = 0
         update_nim_startup(phase, message, checks=checks)
         time.sleep(10)
     err = f"NIM readiness failed ({http_url}, gRPC :{grpc_port}): {last_error}"
