@@ -28,7 +28,8 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
 
 COPY scripts/docker/record-nim-bundle-entrypoint.sh /tmp/record-nim-bundle-entrypoint.sh
 COPY scripts/docker/copy-nim-bundle.sh /tmp/copy-nim-bundle.sh
-RUN chmod +x /tmp/record-nim-bundle-entrypoint.sh /tmp/copy-nim-bundle.sh
+COPY scripts/docker/install-nim-runtime-stubs.sh /tmp/install-nim-runtime-stubs.sh
+RUN chmod +x /tmp/record-nim-bundle-entrypoint.sh /tmp/copy-nim-bundle.sh /tmp/install-nim-runtime-stubs.sh
 RUN --mount=from=nim-svd,source=/,target=/nim-src,readonly \
     bash /tmp/copy-nim-bundle.sh /nim-src "${NIM_BUNDLE_ROOT}/synthetic-video-detector" synthetic-video-detector /tmp/record-nim-bundle-entrypoint.sh
 
@@ -47,7 +48,8 @@ COPY client ./client
 COPY assets ./assets
 COPY scripts/docker ./scripts/docker
 
-RUN chmod +x scripts/docker/*.sh cai/runtime/scripts/*.sh cai/amp/5_apps/*.sh && \
+RUN bash /tmp/install-nim-runtime-stubs.sh && \
+    chmod +x scripts/docker/*.sh cai/runtime/scripts/*.sh cai/amp/5_apps/*.sh && \
     uv sync --extra test && \
     bash protos/generate_protos.sh 2>/dev/null || true && \
     mkdir -p /var/lib/synthetic-video-detector/models && \
@@ -60,7 +62,12 @@ RUN ln -sf "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/nim" /opt/nim && \
     chown -R cdsw:cdsw /opt/nim "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/nim/workspace" && \
     chmod u=rwx,go=rx "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/nim/workspace" && \
     chown cdsw:cdsw /usr/local/bin/run-bundled-nim && \
-    chmod u=rwx,go=rx /usr/local/bin/run-bundled-nim
+    chmod u=rwx,go=rx /usr/local/bin/run-bundled-nim && \
+    if [ -x "${NIM_BUNDLE_ROOT}/synthetic-video-detector/usr/local/bin/python3.12" ]; then \
+      "${NIM_BUNDLE_ROOT}/synthetic-video-detector/usr/local/bin/python3.12" -m pip install \
+        --no-cache-dir --disable-pip-version-check --no-user --isolated --break-system-packages \
+        --target /opt/nvidia-nim/synthetic-video-detector/.nim_py_vendor wrapt; \
+    fi
 
 USER cdsw
 WORKDIR ${APP_ROOT}

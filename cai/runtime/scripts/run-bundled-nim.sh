@@ -34,28 +34,15 @@ require_access() {
 # CAI runtime images expose GPUs via nvidia-smi but omit CUDA sample deviceQuery.
 # NIM entrypoint.d/51-gpu-sm-version-check.sh requires it — provide a minimal stub.
 ensure_device_query_stub() {
-  local stub_dir="${project}/cai/runtime/bin"
-  local stub="${stub_dir}/deviceQuery"
-  mkdir -p "${stub_dir}"
-  require_access "${stub_dir}" write
-  if [[ -x "${stub}" ]]; then
-    export PATH="${stub_dir}:${PATH}"
-    return 0
-  fi
-  local cap major minor name
-  cap="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d ' ' || true)"
-  major="${cap%%.*}"
-  minor="${cap##*.}"
-  name="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo "GPU")"
-  cat >"${stub}" <<EOF
-#!/usr/bin/env bash
-echo "Detected 1 CUDA Capable device(s)"
-echo "Device 0: \"${name}\""
-echo "  CUDA Capability Major/Minor version number:    ${major:-7}.${minor:-5}"
-exit 0
-EOF
-  chmod u=rwx,go=rx "${stub}"
-  export PATH="${stub_dir}:${PATH}"
+  for stub_dir in \
+    "${project}/cai/runtime/bin" \
+    "/opt/synthetic-video-detector/cai/runtime/bin"; do
+    if [[ -x "${stub_dir}/deviceQuery" ]]; then
+      export PATH="${stub_dir}:${PATH}"
+      return 0
+    fi
+  done
+  echo "WARNING: deviceQuery stub missing — NIM GPU check may fail" >&2
 }
 ensure_device_query_stub
 
@@ -119,8 +106,18 @@ if [[ ! -e /opt/nim && -d "${bundle_root}/opt/nim" ]]; then
 fi
 
 collect_bundled_pythonpath() {
-  local -a paths=("${bundle_root}/opt/nim")
-  local site_dir
+  local -a paths=(
+    "${bundle_root}/opt/nim"
+    "${bundle_root}/opt/nim/workspace"
+    "${bundle_root}/opt/maxine"
+    "${bundle_root}/.nim_py_vendor"
+  )
+  local inference_init inference_root site_dir
+  inference_init="$(find "${bundle_root}" -path '*/inference/__init__.py' 2>/dev/null | head -1 || true)"
+  if [[ -n "${inference_init}" ]]; then
+    inference_root="$(dirname "$(dirname "${inference_init}")")"
+    paths+=("${inference_root}")
+  fi
   while IFS= read -r site_dir; do
     paths+=("${site_dir}")
   done < <(
@@ -230,6 +227,38 @@ if [[ -z "${bundled_python}" || ! -x "${bundled_python}" ]]; then
 fi
 ensure_nim_python_deps
 
+verify_nim_bootstrap() {
+  echo "Verifying bundled NIM imports (wrapt, nimlib, inference)..."
+  if ! env PIP_USER=0 PYTHONNOUSERSITE=1 PYTHONPATH="${nim_pythonpath}" "${bundled_python}" - <<'PY'
+import wrapt
+import nimlib
+import inference
+print("wrapt:", wrapt.__file__)
+print("nimlib:", nimlib.__file__)
+print("inference:", getattr(inference, "__file__", "ok"))
+PY
+  then
+    echo "ERROR: bundled NIM bootstrap import failed — check PYTHONPATH and svd_nim.log" >&2
+    exit 1
+  fi
+}
+verify_nim_bootstrap
+
+write_nim_python_startup() {
+  local startup="${NIM_CACHE_PATH}/.nim_py_startup.py"
+  cat >"${startup}" <<'PY'
+# Auto-import inference so nimlib registers the gRPC servicer in the NIM process.
+try:
+    import inference  # noqa: F401
+except Exception as exc:
+    import sys
+    print(f"ERROR: PYTHONSTARTUP failed to import inference: {exc}", file=sys.stderr)
+    raise
+PY
+  export PYTHONSTARTUP="${startup}"
+  echo "PYTHONSTARTUP=${PYTHONSTARTUP}"
+}
+
 select_nim_profile() {
   local cap profile
   cap="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d ' ' || true)"
@@ -277,19 +306,37 @@ require_access "${nvidia_entrypoint}" read
 
 launch_nim() {
   local start_script="$1"
-  echo "Launching NIM (sanitized PYTHONPATH): ${nvidia_entrypoint} ${start_script}"
+  write_nim_python_startup
+  echo "Launching NIM (sanitized env): ${nvidia_entrypoint} ${start_script}"
   echo "  PYTHONPATH=${nim_pythonpath}"
   echo "  python=${bundled_python}"
   echo "  NIM_MODEL_PROFILE=${NIM_MODEL_PROFILE}"
-  export PATH="${nim_bin_path}"
-  export PYTHONPATH="${nim_pythonpath}"
-  export NIM_MODEL_PROFILE
-  unset NIM_MANIFEST_PROFILE 2>/dev/null || true
-  export PYTHONNOUSERSITE=1
-  export PYTHON="${bundled_python}"
-  export LD_LIBRARY_PATH="${nim_ld_library_path}"
-  unset PYTHONHOME PYTHONUSERBASE CONDA_PREFIX CONDA_DEFAULT_ENV 2>/dev/null || true
-  exec bash "${nvidia_entrypoint}" "${start_script}"
+  # Minimal env — drop Cloudera/Jupyter PYTHONPATH and project /opt/synthetic-video-detector paths.
+  exec env -i \
+    HOME="${HOME:-/home/cdsw}" \
+    USER="${USER:-cdsw}" \
+    LOGNAME="${LOGNAME:-cdsw}" \
+    PATH="${nim_bin_path}" \
+    PYTHONPATH="${nim_pythonpath}" \
+    PYTHON="${bundled_python}" \
+    PYTHONNOUSERSITE=1 \
+    PYTHONSTARTUP="${PYTHONSTARTUP}" \
+    PIP_USER=0 \
+    PIP_BREAK_SYSTEM_PACKAGES=1 \
+    LD_LIBRARY_PATH="${nim_ld_library_path}" \
+    NGC_API_KEY="${NGC_API_KEY:-}" \
+    NIM_CACHE_PATH="${NIM_CACHE_PATH}" \
+    NIM_CACHE_DIR="${NIM_CACHE_DIR:-${NIM_CACHE_PATH}}" \
+    NVCF_MODELS_DIR="${NVCF_MODELS_DIR:-${NIM_CACHE_PATH}}" \
+    NIM_HTTP_API_PORT="${NIM_HTTP_API_PORT:-8000}" \
+    NIM_GRPC_API_PORT="${NIM_GRPC_API_PORT:-8001}" \
+    NIM_MODEL_PROFILE="${NIM_MODEL_PROFILE}" \
+    NVIDIA_VISIBLE_DEVICES="${NVIDIA_VISIBLE_DEVICES:-}" \
+    NVIDIA_DRIVER_CAPABILITIES="${NVIDIA_DRIVER_CAPABILITIES:-all}" \
+    MAXINE_MAX_INPUT_FILE_SIZE_MB="${MAXINE_MAX_INPUT_FILE_SIZE_MB:-500}" \
+    NIM_ROOT="${NIM_ROOT:-}" \
+    NIM_MANIFEST_PATH="${NIM_MANIFEST_PATH:-}" \
+    bash "${nvidia_entrypoint}" "${start_script}"
 }
 
 start_server_file="${bundle_root}/start_server"

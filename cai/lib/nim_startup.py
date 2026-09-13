@@ -32,7 +32,6 @@ def _default_status() -> dict[str, Any]:
             "gpu_visible": False,
             "config_applied": False,
             "endpoints_wired": False,
-            "sidecar_started": False,
             "nim_process_started": False,
             "http_ready": False,
             "grpc_ready": False,
