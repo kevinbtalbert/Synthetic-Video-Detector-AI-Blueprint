@@ -73,12 +73,12 @@ USER cdsw
 WORKDIR ${APP_ROOT}
 
 # Runtime catalog metadata (Cloudera custom-runtime convention).
-# short.maintenance → full version (e.g. 1.4.0). AMP matches on short version (1.4).
+# short.maintenance → full version (e.g. 1.5.0). AMP matches on short version (1.5).
 # Bump ML_RUNTIME_MAINTENANCE_VERSION on each repush to register a new catalog entry.
 ENV ML_RUNTIME_EDITION="SyntheticVideoDetector" \
     ML_RUNTIME_EDITOR="JupyterLab" \
     ML_RUNTIME_KERNEL="Python 3.13" \
-    ML_RUNTIME_SHORT_VERSION="1.4" \
+    ML_RUNTIME_SHORT_VERSION="1.5" \
     ML_RUNTIME_MAINTENANCE_VERSION="0" \
     ML_RUNTIME_DESCRIPTION="JupyterLab Runtime with NVIDIA Synthetic Video Detector NIM"
 
