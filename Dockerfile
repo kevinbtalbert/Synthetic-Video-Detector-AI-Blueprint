@@ -57,6 +57,7 @@ RUN bash /tmp/install-nim-runtime-stubs.sh && \
 
 COPY cai/runtime/scripts/run-bundled-nim.sh /usr/local/bin/run-bundled-nim
 COPY cai/runtime/scripts/prepare-bundled-nim-models.sh /usr/local/bin/prepare-bundled-nim-models
+COPY cai/runtime/scripts/bundled-svd-grpc-start.sh /usr/local/bin/bundled-svd-grpc-start
 # NIM expects /opt/nim, /opt/tritonserver, /opt/synthetic-detector, and /config (→ .config-root).
 RUN mkdir -p /opt/nim \
              /opt/nim/.config-root/models/synthetic-video-detector \
@@ -67,8 +68,8 @@ RUN mkdir -p /opt/nim \
     ln -sfn "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/synthetic-detector" /opt/synthetic-detector && \
     chown -R cdsw:cdsw /opt/nim /opt/tritonserver /opt/synthetic-detector \
       "${NIM_BUNDLE_ROOT}/synthetic-video-detector" && \
-    chown cdsw:cdsw /usr/local/bin/run-bundled-nim /usr/local/bin/prepare-bundled-nim-models && \
-    chmod u=rwx,go=rx /usr/local/bin/run-bundled-nim /usr/local/bin/prepare-bundled-nim-models && \
+    chown cdsw:cdsw /usr/local/bin/run-bundled-nim /usr/local/bin/prepare-bundled-nim-models /usr/local/bin/bundled-svd-grpc-start && \
+    chmod u=rwx,go=rx /usr/local/bin/run-bundled-nim /usr/local/bin/prepare-bundled-nim-models /usr/local/bin/bundled-svd-grpc-start && \
     test -x "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/synthetic-detector/src/grpc/start_service.sh" && \
     if [ -x "${NIM_BUNDLE_ROOT}/synthetic-video-detector/usr/local/bin/python3.12" ]; then \
       "${NIM_BUNDLE_ROOT}/synthetic-video-detector/usr/local/bin/python3.12" -m pip install \
@@ -86,7 +87,7 @@ ENV ML_RUNTIME_EDITION="SyntheticVideoDetector" \
     ML_RUNTIME_EDITOR="JupyterLab" \
     ML_RUNTIME_KERNEL="Python 3.13" \
     ML_RUNTIME_SHORT_VERSION="1.5" \
-    ML_RUNTIME_MAINTENANCE_VERSION="1" \
+    ML_RUNTIME_MAINTENANCE_VERSION="2" \
     ML_RUNTIME_DESCRIPTION="JupyterLab Runtime with NVIDIA Synthetic Video Detector NIM"
 
 ENV ML_RUNTIME_FULL_VERSION="${ML_RUNTIME_SHORT_VERSION}.${ML_RUNTIME_MAINTENANCE_VERSION}"

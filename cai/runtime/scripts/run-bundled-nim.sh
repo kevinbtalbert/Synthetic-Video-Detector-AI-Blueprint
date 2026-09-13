@@ -118,6 +118,7 @@ configure_nim_image_env() {
   export SYNTHETIC_DETECTOR_ROOT="${SYNTHETIC_DETECTOR_ROOT:-/opt/synthetic-detector}"
   export NIM_HTTP_API_PORT="${NIM_HTTP_API_PORT:-8000}"
   export NIM_GRPC_API_PORT="${NIM_GRPC_API_PORT:-8001}"
+  export GRPC_SERVICE_URI="${GRPC_SERVICE_URI:-127.0.0.1:${NIM_GRPC_API_PORT}}"
 }
 
 select_nim_profile() {
@@ -258,10 +259,30 @@ print('bootstrap OK')
   exit 1
 fi
 
-if [[ ! -x /opt/synthetic-detector/src/grpc/start_service.sh ]]; then
-  echo "ERROR: /opt/synthetic-detector/src/grpc/start_service.sh missing — rebuild runtime 1.5.1+" >&2
-  exit 1
-fi
+install_bundled_grpc_start() {
+  local shim_src="" target="/opt/synthetic-detector/src/grpc/start_service.sh"
+  for candidate in \
+    "${CDSW_PROJECT_DIR:-}/cai/runtime/scripts/bundled-svd-grpc-start.sh" \
+    /usr/local/bin/bundled-svd-grpc-start \
+    /opt/synthetic-video-detector/cai/runtime/scripts/bundled-svd-grpc-start.sh; do
+    if [[ -f "${candidate}" ]]; then
+      shim_src="${candidate}"
+      break
+    fi
+  done
+  [[ -n "${shim_src}" ]] || {
+    echo "ERROR: bundled-svd-grpc-start.sh missing" >&2
+    exit 1
+  }
+  [[ -d "$(dirname "${target}")" ]] || {
+    echo "ERROR: ${target} missing — rebuild runtime 1.5.1+" >&2
+    exit 1
+  }
+  cp "${shim_src}" "${target}"
+  chmod u=rx,go=rx "${target}" 2>/dev/null || chmod +x "${target}"
+  echo "Installed bundled gRPC start (${GRPC_SERVICE_URI}) → ${target}"
+}
+install_bundled_grpc_start
 
 entrypoint="$(tr -d '\n' <"${entrypoint_file}")"
 [[ -x "${entrypoint}" ]] || chmod +x "${entrypoint}" 2>/dev/null || true
@@ -278,6 +299,7 @@ export NIM_CACHE_DIR="/opt/nim/.cache"
 export NIM_CACHE_PATH="${NIM_CACHE_PATH}"
 export NIM_HTTP_API_PORT="${NIM_HTTP_API_PORT}"
 export NIM_GRPC_API_PORT="${NIM_GRPC_API_PORT}"
+export GRPC_SERVICE_URI="${GRPC_SERVICE_URI}"
 export NIM_DISABLE_GRPC_STARTUP="${NIM_DISABLE_GRPC_STARTUP}"
 export NIM_DIR_PATH="${NIM_DIR_PATH}"
 export NIM_LIB_PATH="${NIM_LIB_PATH}"
@@ -302,6 +324,7 @@ EOF
 chmod +x "${launch_wrapper}"
 
 echo "Starting bundled ${nim_type} NIM"
+echo "  GRPC_SERVICE_URI=${GRPC_SERVICE_URI} (localhost gRPC for in-pod detect)"
 echo "  NIM_DISABLE_GRPC_STARTUP=${NIM_DISABLE_GRPC_STARTUP} (HTTP via nimlib; gRPC via start_service.sh)"
 echo "  NVCF_MODELS_DIR=${NVCF_MODELS_DIR}"
 echo "  SYNTHETIC_DETECTOR_ROOT=${SYNTHETIC_DETECTOR_ROOT}"
