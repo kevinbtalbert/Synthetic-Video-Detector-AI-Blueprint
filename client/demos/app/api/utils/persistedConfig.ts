@@ -6,8 +6,13 @@ export type PersistedConfig = {
   svd_nvidia_function_id?: string;
   nvidia_serverless_grpc_host?: string;
   nvidia_serverless_grpc_port?: string;
+  svd_hf_model_id?: string;
+  svd_open_model_preset?: string;
+  svd_open_model_kind?: string;
+  svd_open_port?: string;
   detection_threshold?: string;
   ngc_api_key?: string;
+  hf_token?: string;
 };
 
 const ENV_MAP: Record<string, string> = {
@@ -15,8 +20,13 @@ const ENV_MAP: Record<string, string> = {
   svd_nvidia_function_id: "SVD_NVIDIA_FUNCTION_ID",
   nvidia_serverless_grpc_host: "NVIDIA_SERVERLESS_GRPC_HOST",
   nvidia_serverless_grpc_port: "NVIDIA_SERVERLESS_GRPC_PORT",
+  svd_hf_model_id: "SVD_HF_MODEL_ID",
+  svd_open_model_preset: "SVD_OPEN_MODEL_PRESET",
+  svd_open_model_kind: "SVD_OPEN_MODEL_KIND",
+  svd_open_port: "SVD_OPEN_PORT",
   detection_threshold: "SVD_DETECTION_THRESHOLD",
   ngc_api_key: "NGC_API_KEY",
+  hf_token: "HF_TOKEN",
 };
 
 function projectRoot(): string {
@@ -52,18 +62,25 @@ function applyDotenvFile(targetPath: string, env: NodeJS.ProcessEnv): void {
   }
 }
 
+function normalizeMode(mode: string): string {
+  const token = mode.toUpperCase();
+  if (token === "OPEN" || token === "OPEN_WEIGHTS" || token === "HF") return "BUNDLED";
+  if (token === "BUNDLE" || token === "GPU") return "BUNDLED";
+  return token;
+}
+
 function applyDeploymentJson(env: NodeJS.ProcessEnv): void {
   const configPath = deploymentConfigPath();
   if (!fs.existsSync(configPath)) return;
   try {
     const raw = JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
-    const mode = String(env.NIM_DEPLOY_MODE || raw.nim_deploy_mode || "BUNDLED").toUpperCase();
+    const mode = normalizeMode(String(env.NIM_DEPLOY_MODE || raw.nim_deploy_mode || "OPEN"));
     let data: PersistedConfig;
-    if (raw.serverless || raw.bundled) {
+    if (raw.serverless || raw.open || raw.bundled) {
       const section =
         mode === "SERVERLESS"
           ? (raw.serverless as PersistedConfig)
-          : (raw.bundled as PersistedConfig);
+          : ((raw.open || raw.bundled) as PersistedConfig);
       data = { ...section, nim_deploy_mode: mode };
     } else {
       data = raw as PersistedConfig;
@@ -80,18 +97,18 @@ function applyDeploymentJson(env: NodeJS.ProcessEnv): void {
 const BAKED_RUNTIME_KEYS = [
   "NIM_DEPLOY_MODE",
   "NGC_API_KEY",
+  "HF_TOKEN",
+  "SVD_HF_MODEL_ID",
+  "SVD_OPEN_MODEL_PRESET",
+  "SVD_OPEN_MODEL_KIND",
+  "SVD_OPEN_PORT",
+  "SVD_OPEN_SERVER",
   "SVD_NVIDIA_FUNCTION_ID",
   "NVIDIA_SERVERLESS_GRPC_HOST",
   "NVIDIA_SERVERLESS_GRPC_PORT",
   "SVD_DETECTION_THRESHOLD",
   "SVD_APP_ROLE",
-  "SVD_SERVER",
 ] as const;
-
-function isLocalServer(server: string): boolean {
-  const host = server.split(":")[0]?.toLowerCase() || "";
-  return host === "127.0.0.1" || host === "localhost" || host === "0.0.0.0";
-}
 
 /** Merge env for detect API. Runtime apps use CML-baked env only; Launchpad reads saved config. */
 export function buildDetectProcessEnv(): NodeJS.ProcessEnv {
@@ -113,18 +130,15 @@ export function buildDetectProcessEnv(): NodeJS.ProcessEnv {
     for (const [key, value] of Object.entries(baked)) {
       if (value) env[key] = value;
     }
-    const mode = String(env.NIM_DEPLOY_MODE || "BUNDLED").toUpperCase();
-    if (mode === "BUNDLED") {
-      env.NIM_DEPLOY_MODE = "BUNDLED";
-      const server = String(env.SVD_SERVER || "");
-      if (!isLocalServer(server)) {
-        env.SVD_SERVER =
-          baked.SVD_SERVER && isLocalServer(baked.SVD_SERVER) ? baked.SVD_SERVER : "127.0.0.1:8001";
-      }
+    const mode = normalizeMode(String(env.NIM_DEPLOY_MODE || "OPEN"));
+    if (mode === "OPEN") {
+      env.NIM_DEPLOY_MODE = "OPEN";
+      const port = String(env.SVD_OPEN_PORT || "8080");
+      env.SVD_OPEN_SERVER = String(env.SVD_OPEN_SERVER || `http://127.0.0.1:${port}`);
     }
   }
 
-  const mode = String(env.NIM_DEPLOY_MODE || "BUNDLED").toUpperCase();
+  const mode = normalizeMode(String(env.NIM_DEPLOY_MODE || "OPEN"));
   if (mode === "SERVERLESS" && role === "launchpad") {
     const server = String(env.SVD_SERVER || "");
     const host = server.split(":")[0]?.toLowerCase() || "";
@@ -136,7 +150,7 @@ export function buildDetectProcessEnv(): NodeJS.ProcessEnv {
 }
 
 export function validateDetectEnv(env: NodeJS.ProcessEnv): string | null {
-  const mode = String(env.NIM_DEPLOY_MODE || "BUNDLED").toUpperCase();
+  const mode = normalizeMode(String(env.NIM_DEPLOY_MODE || "OPEN"));
   const role = String(env.SVD_APP_ROLE || "runtime");
   if (mode === "SERVERLESS") {
     if (!env.NGC_API_KEY?.trim()) {
@@ -144,15 +158,12 @@ export function validateDetectEnv(env: NodeJS.ProcessEnv): string | null {
     }
     return null;
   }
-  const server = String(env.SVD_SERVER || "");
-  if (!server) {
-    return "Bundled NIM endpoints are not configured. Wait for the app to finish starting NIM.";
+  const openServer = String(env.SVD_OPEN_SERVER || "");
+  if (!openServer && role === "runtime") {
+    return "Open model server is not configured. Wait for the app to finish loading the Hugging Face model.";
   }
   if (role === "launchpad") {
-    const host = server.split(":")[0]?.toLowerCase() || "";
-    if (host === "127.0.0.1" || host === "localhost") {
-      return "Open the deployed Bundled app URL from the Launchpad to run detection.";
-    }
+    return "Open the deployed Open Weights app URL from the Launchpad to run detection.";
   }
   return null;
 }

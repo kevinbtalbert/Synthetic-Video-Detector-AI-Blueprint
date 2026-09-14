@@ -1,0 +1,44 @@
+{
+  "default_preset_id": "videomae-ffc23",
+  "presets": [
+    {
+      "id": "videomae-ffc23",
+      "name": "VideoMAE Deepfake Detector",
+      "subtitle": "Temporal video model · FaceForensics++",
+      "hf_model_id": "eftt/VideoMae-ffc23-deepfake-detector",
+      "kind": "videomae",
+      "recommended": true,
+      "vram_gb": 8,
+      "tags": ["Video-native", "Binary real/fake"],
+      "summary": "Fine-tuned VideoMAE that uses 16 frames per clip to catch temporal manipulation cues image models miss.",
+      "metrics_hint": "~88% accuracy · 0.84 AUC on FF++ subset (per model card)",
+      "hf_url": "https://huggingface.co/eftt/VideoMae-ffc23-deepfake-detector"
+    },
+    {
+      "id": "ai-deepfake-real-v2",
+      "name": "AI vs Deepfake vs Real",
+      "subtitle": "SigLIP encoder · three-way classification",
+      "hf_model_id": "prithivMLmods/AI-vs-Deepfake-vs-Real-v2.0",
+      "kind": "image",
+      "recommended": false,
+      "vram_gb": 6,
+      "tags": ["Frame sampling", "3-class"],
+      "summary": "Separates fully AI-generated, deepfake-manipulated, and authentic stills—aggregated over sampled video frames.",
+      "metrics_hint": "Strong for mixed synthetic media pipelines and editorial triage",
+      "hf_url": "https://huggingface.co/prithivMLmods/AI-vs-Deepfake-vs-Real-v2.0"
+    },
+    {
+      "id": "deepfake-vs-real-image",
+      "name": "Deepfake vs Real (ViT)",
+      "subtitle": "Lightweight binary classifier",
+      "hf_model_id": "dima806/deepfake_vs_real_image_detection",
+      "kind": "image",
+      "recommended": false,
+      "vram_gb": 4,
+      "tags": ["Frame sampling", "Fast startup"],
+      "summary": "Compact ViT-style binary detector—good for demos, smoke tests, and smaller GPUs.",
+      "metrics_hint": "Lower VRAM · faster cold start than VideoMAE",
+      "hf_url": "https://huggingface.co/dima806/deepfake_vs_real_image_detection"
+    }
+  ]
+}

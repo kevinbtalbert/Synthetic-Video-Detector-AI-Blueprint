@@ -1,19 +1,18 @@
 name: Synthetic Video Detector
 description: |
-  Deploy NVIDIA Synthetic Video Detector on Cloudera AI Workbench. AMP installs
-  dependencies and starts the Launchpad. Use the Launchpad to deploy all-in-one
-  Serverless or Bundled NIM runtime applications.
+  Synthetic video detection on Cloudera AI Workbench. Launchpad deploys Bundled (GPU,
+  Hugging Face) or Serverless (NVIDIA NVCF, 1.6-compatible) all-in-one applications.
 author: Cloudera
 specification_version: 1.0
-prototype_version: 1.6
-date: "2026-09-10"
+prototype_version: 1.9
+date: "2026-09-14"
 shared_memory_limit: 8
 
 runtimes:
   - editor: JupyterLab
     kernel: Python 3.13
     edition: SyntheticVideoDetector
-    version: "1.6"
+    version: "1.9"
 
 tasks:
   - type: run_session
@@ -35,10 +34,10 @@ tasks:
   - type: start_application
     name: Synthetic Video Detector Launchpad
     script: cai/amp/6_demo_ui/start_demo.py
-    short_summary: Launchpad — deploy Serverless or Bundled all-in-one applications
+    short_summary: Launchpad — deploy Serverless or Open Weights all-in-one applications
     long_summary: |
       Start the Synthetic Video Detector Launchpad. Deploy all-in-one Serverless
-      (NVCF) or Bundled NIM (GPU) applications from the UI. Each runtime app
+      (NVCF) or Open Weights (GPU) applications from the UI. Each runtime app
       includes the detection UI. Enable unauthenticated app access for external URLs.
     cpu: 2
     memory: 8

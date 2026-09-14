@@ -28,6 +28,7 @@ export type ServiceStatus = {
 export type DeploymentStatus = {
   pipeline_ready?: boolean;
   serverless_ready?: boolean;
+  open_ready?: boolean;
   bundled_ready?: boolean;
   pipeline_failed?: boolean;
   build_in_progress?: boolean;
@@ -35,10 +36,12 @@ export type DeploymentStatus = {
   nim_deploy_mode?: string;
   config?: {
     serverless?: Record<string, unknown>;
+    open?: Record<string, unknown>;
     bundled?: Record<string, unknown>;
   };
   secrets_set?: {
     serverless?: { ngc_api_key?: boolean };
+    open?: { hf_token?: boolean };
     bundled?: { ngc_api_key?: boolean };
   };
   mode_summary?: { headline?: string; detail?: string };
@@ -56,7 +59,7 @@ export type DeploymentStatus = {
 /** Resolve active deploy mode from status API or runtime env (all-in-one apps). */
 export function resolveDeployMode(status: DeploymentStatus | null): string {
   if (status?.nim_deploy_mode) return status.nim_deploy_mode;
-  if (status?.bundled_ready) return "BUNDLED";
+  if (status?.bundled_ready || status?.open_ready) return "BUNDLED";
   if (status?.serverless_ready) return "SERVERLESS";
   const fromEnv = process.env.NEXT_PUBLIC_NIM_DEPLOY_MODE || process.env.NIM_DEPLOY_MODE;
   if (fromEnv) return fromEnv;

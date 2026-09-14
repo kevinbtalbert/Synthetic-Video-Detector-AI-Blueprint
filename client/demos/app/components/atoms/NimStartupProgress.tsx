@@ -20,17 +20,17 @@ export function NimStartupDetails({
   compact?: boolean;
 }) {
   const phase = startup?.phase || "unknown";
-  const message = startup?.message || "Waiting for NIM status…";
+  const message = startup?.message || "Waiting for model server status…";
   const elapsedSeconds = startup?.elapsed_s || 0;
   const checkEntries = Object.entries(startup?.checks || {});
   const logTail = startup?.log_tail || [];
   const startupError = startup?.error;
 
-  if (ready && phase === "ready") {
+  if (ready) {
     if (compact) return null;
     return (
-      <Card title="NIM status">
-        <p className="text-sm text-green-400">NIM is ready for detection.</p>
+      <Card title="Model server">
+        <p className="text-sm text-green-400">Model server is ready for detection.</p>
       </Card>
     );
   }
@@ -54,22 +54,21 @@ export function NimStartupDetails({
         )}
         {!compact && logTail.length > 0 && (
           <details className="rounded border border-neutral-800 bg-neutral-950/60 p-3">
-            <summary className="cursor-pointer text-neutral-400">Recent NIM logs</summary>
+            <summary className="cursor-pointer text-neutral-400">Recent model server logs</summary>
             <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap text-xs text-neutral-400">
               {logTail.join("\n")}
             </pre>
           </details>
         )}
         <p className="text-xs text-neutral-500">
-          First bundled startup can take 15–30+ minutes while models load. Logs:{" "}
-          <code className="text-neutral-400">cai/config/svd_nim.log</code>,{" "}
-          <code className="text-neutral-400">cai/config/svd_bundled_app.log</code>
+          First startup may download Hugging Face weights (several minutes). Log:{" "}
+          <code className="text-neutral-400">cai/config/svd_open_model.log</code>
         </p>
       </div>
   );
 
   if (compact) return body;
-  return <Card title="NIM startup progress">{body}</Card>;
+  return <Card title="Model server startup">{body}</Card>;
 }
 
 export default function NimStartupProgress({ compact = false }: { compact?: boolean }) {
@@ -77,8 +76,8 @@ export default function NimStartupProgress({ compact = false }: { compact?: bool
 
   if (loading && !startup) {
     return (
-      <Card title="NIM startup">
-        <p className="text-sm text-neutral-400">Loading NIM startup status…</p>
+      <Card title="Model server">
+        <p className="text-sm text-neutral-400">Loading model server status…</p>
       </Card>
     );
   }

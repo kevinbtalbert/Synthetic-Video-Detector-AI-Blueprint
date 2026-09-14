@@ -1,4 +1,4 @@
-"""Track bundled NIM startup progress for the runtime UI and Launchpad."""
+"""Track open-weights model server startup for the runtime UI and Launchpad."""
 
 from __future__ import annotations
 
@@ -10,9 +10,7 @@ from typing import Any
 from cai.lib.paths import CONFIG_DIR
 
 NIM_STARTUP_JSON = CONFIG_DIR / "nim_startup.json"
-SVD_NIM_LOG = CONFIG_DIR / "svd_nim.log"
-SVD_BUNDLED_APP_LOG = CONFIG_DIR / "svd_bundled_app.log"
-SVD_SIDEcar_LOG = CONFIG_DIR / "svd_sidecar.log"
+SVD_OPEN_MODEL_LOG = CONFIG_DIR / "svd_open_model.log"
 
 
 def _now() -> float:
@@ -22,7 +20,7 @@ def _now() -> float:
 def _default_status() -> dict[str, Any]:
     return {
         "phase": "idle",
-        "message": "NIM not started",
+        "message": "Model server not started",
         "ready": False,
         "error": None,
         "started_at": None,
@@ -32,10 +30,8 @@ def _default_status() -> dict[str, Any]:
             "gpu_visible": False,
             "config_applied": False,
             "endpoints_wired": False,
-            "nim_process_started": False,
-            "http_ready": False,
-            "grpc_ready": False,
-            "models_loaded": False,
+            "model_process_started": False,
+            "model_server_ready": False,
             "endpoints_published": False,
         },
         "log_tail": [],
@@ -52,7 +48,7 @@ def tail_log(path: Path, *, lines: int = 12) -> list[str]:
         return []
 
 
-def reset_nim_startup(*, message: str = "Bundled NIM startup initiated") -> None:
+def reset_nim_startup(*, message: str = "Open model server startup initiated") -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     now = _now()
     payload = _default_status()
@@ -74,7 +70,7 @@ def update_nim_startup(
     ready: bool = False,
     error: str | None = None,
     checks: dict[str, bool] | None = None,
-    log_paths: tuple[Path, ...] = (SVD_NIM_LOG, SVD_BUNDLED_APP_LOG),
+    log_paths: tuple[Path, ...] = (SVD_OPEN_MODEL_LOG,),
 ) -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     current = read_nim_startup() or _default_status()

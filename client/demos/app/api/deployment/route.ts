@@ -21,7 +21,7 @@ export async function GET(): Promise<NextResponse> {
   });
 }
 
-type DeployMode = "SERVERLESS" | "BUNDLED";
+type DeployMode = "SERVERLESS" | "OPEN" | "BUNDLED";
 
 type DeploymentRequestBody = {
   action?: string;

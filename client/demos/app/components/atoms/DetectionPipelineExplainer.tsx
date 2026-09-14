@@ -1,60 +1,81 @@
 "use client";
 
-const STEPS = [
+const SERVERLESS_STEPS = [
   {
     title: "Upload & validate",
-    body: "Your MP4 is sent securely to the NVIDIA Synthetic Video Detector NIM. Only H.264 MP4 is supported (same constraint as production NIM deployments).",
+    body: "Your H.264 MP4 is streamed to the NVIDIA Synthetic Video Detector on Cloud Functions—the same NVCF gRPC path as release 1.6.",
   },
   {
     title: "Temporal clip analysis",
-    body: "The Hiera-based model splits the video into short clips. Each clip gets a raw score (logit) tied to a frame index in the timeline—not a single guess for the whole file.",
+    body: "The hosted model returns clip-level logits aligned to frames on the timeline.",
   },
   {
     title: "Stream results",
-    body: "Scores stream back while inference runs, so you can see progress clip-by-clip. This is the same gRPC API used on build.nvidia.com and in bundled GPU runtimes.",
+    body: "Scores arrive incrementally over gRPC while inference runs.",
   },
   {
     title: "Aggregate verdict",
-    body: "Clip scores are combined into one synthetic probability. Above 30% threshold → likely AI-generated; below → likely authentic. Use the timeline chart to spot suspicious segments.",
+    body: "Final synthetic probability and timeline chart against your threshold.",
+  },
+];
+
+const BUNDLED_STEPS = [
+  {
+    title: "Upload & validate",
+    body: "Video stays in your GPU application—no external inference API required for the bundled path.",
+  },
+  {
+    title: "Temporal analysis",
+    body: "VideoMAE windows or frame classifiers produce clip-aligned scores across the file.",
+  },
+  {
+    title: "Stream results",
+    body: "The in-pod model server returns the same clip and aggregate result shape as Detect expects.",
+  },
+  {
+    title: "Aggregate verdict",
+    body: "Thresholded synthetic probability and timeline for editorial and integrity workflows.",
   },
 ];
 
 export default function DetectionPipelineExplainer({ deployMode }: { deployMode: string }) {
+  const mode = String(deployMode).toUpperCase();
+  const bundled = mode === "BUNDLED" || mode === "OPEN" || mode === "OPEN_WEIGHTS";
+  const steps = bundled ? BUNDLED_STEPS : SERVERLESS_STEPS;
+
   return (
-    <section className="rounded-xl border border-neutral-800 bg-gradient-to-br from-neutral-950 via-neutral-950 to-[#0f140a] p-6">
+    <section className="rounded-xl border border-[var(--border)] bg-gradient-to-br from-[var(--surface)] via-[var(--surface)] to-[#0a1205] p-6 shadow-[var(--shadow-card)]">
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--nvidia-green)]">
-            Why this matters
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">
+            Detection pipeline
           </p>
-          <h2 className="text-xl font-semibold text-neutral-100">
-            Trust signals for synthetic media
+          <h2 className="text-xl font-semibold tracking-tight text-[var(--text-primary)]">
+            Clip-level synthetic media analysis
           </h2>
         </div>
-        <span className="inline-flex w-fit rounded-full border border-neutral-700 bg-neutral-900 px-3 py-1 text-xs text-neutral-400">
-          Runtime: {deployMode}
+        <span className="inline-flex w-fit rounded-full border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-1 text-xs text-[var(--text-muted)]">
+          {bundled ? "Bundled" : "Serverless"}
         </span>
       </div>
-      <p className="mb-6 max-w-3xl text-sm leading-relaxed text-neutral-400">
-        AI-generated video is increasingly realistic. This blueprint runs{" "}
-        <strong className="font-medium text-neutral-200">NVIDIA Synthetic Video Detector</strong>{" "}
-        on Cloudera AI—either bundled on GPU in your project or via NVIDIA cloud inference—so teams
-        can authenticate footage, flag deepfakes in editorial workflows, and audit media before
-        publish.
+      <p className="mb-6 max-w-3xl text-sm leading-relaxed text-[var(--text-secondary)]">
+        {bundled
+          ? "Bundled runtimes run entirely in your project: pick a Hugging Face preset, deploy one GPU app, and use Detect/Demo on the generated URL."
+          : "Serverless runtimes use your NGC credentials to call NVIDIA-hosted Synthetic Video Detector inference—no local GPU."}
       </p>
       <ol className="grid gap-4 sm:grid-cols-2">
-        {STEPS.map((step, i) => (
+        {steps.map((step, i) => (
           <li
             key={step.title}
-            className="rounded-lg border border-neutral-800/80 bg-black/40 p-4"
+            className="rounded-lg border border-[var(--border)] bg-black/30 p-4"
           >
             <div className="mb-2 flex items-center gap-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--nvidia-green)]/15 text-xs font-bold text-[var(--nvidia-green)]">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-xs font-bold text-[var(--accent)]">
                 {i + 1}
               </span>
-              <h3 className="text-sm font-medium text-neutral-100">{step.title}</h3>
+              <h3 className="text-sm font-medium text-[var(--text-primary)]">{step.title}</h3>
             </div>
-            <p className="text-xs leading-relaxed text-neutral-500">{step.body}</p>
+            <p className="text-xs leading-relaxed text-[var(--text-muted)]">{step.body}</p>
           </li>
         ))}
       </ol>

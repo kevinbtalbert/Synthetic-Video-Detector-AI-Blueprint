@@ -1,4 +1,4 @@
-"""Shared helpers for all-in-one SVD runtime applications (serverless or bundled)."""
+"""Shared helpers for all-in-one SVD runtime applications (serverless or open weights)."""
 
 from __future__ import annotations
 
@@ -26,17 +26,16 @@ def start_runtime_ui() -> int:
     if ENDPOINTS_ENV.is_file():
         apply_dotenv_to_os(ENDPOINTS_ENV)
     os.environ["NIM_DEPLOY_MODE"] = baked_mode
-    if baked_mode.upper() == "BUNDLED":
-        server = os.environ.get("SVD_SERVER", "")
-        if not _local_grpc_host(server):
-            os.environ["SVD_SERVER"] = baked_server if _local_grpc_host(baked_server) else "127.0.0.1:8001"
+    if baked_mode.upper() in {"BUNDLED", "OPEN", "OPEN_WEIGHTS"}:
+        port = os.environ.get("SVD_OPEN_PORT", "8080")
+        os.environ.setdefault("SVD_OPEN_SERVER", f"http://127.0.0.1:{port}")
 
     port = os.environ.get("CDSW_APP_PORT") or os.environ.get("PORT") or "8080"
     os.environ["PORT"] = str(port)
     os.environ.setdefault("NODE_ENV", "production")
     os.environ.setdefault("SVD_APP_ROLE", "runtime")
     os.environ.setdefault("NEXT_PUBLIC_SVD_APP_ROLE", "runtime")
-    mode = os.environ.get("NIM_DEPLOY_MODE", "BUNDLED")
+    mode = os.environ.get("NIM_DEPLOY_MODE", "OPEN")
     os.environ.setdefault("NEXT_PUBLIC_NIM_DEPLOY_MODE", mode)
 
     if not demo_ui_ready():
@@ -53,19 +52,24 @@ def start_runtime_ui() -> int:
     return subprocess.call([node, str(SERVER_JS)])
 
 
-def wire_bundled_runtime_endpoints(*, grpc_port: int = 8001) -> None:
-    """Write local runtime endpoints for bundled NIM in this pod."""
+def wire_open_runtime_endpoints(*, port: int = 8080) -> None:
+    """Write local runtime endpoints for open-weights model server in this pod."""
     from cai.lib.cai_common import write_dotenv_file
     from cai.lib.deploy_mode import NIMDeployMode
 
     write_dotenv_file(
         ENDPOINTS_ENV,
         {
-            "SVD_SERVER": f"127.0.0.1:{grpc_port}",
+            "SVD_OPEN_SERVER": f"http://127.0.0.1:{port}",
+            "SVD_OPEN_PORT": str(port),
             "NIM_DEPLOY_MODE": NIMDeployMode.BUNDLED.value,
             "SVD_SSL_MODE": "DISABLED",
         },
     )
+
+
+def wire_bundled_runtime_endpoints(*, grpc_port: int = 8001) -> None:
+    wire_open_runtime_endpoints(port=int(os.environ.get("SVD_OPEN_PORT", "8080")))
 
 
 def wire_serverless_runtime_endpoints(config) -> None:

@@ -38,7 +38,7 @@ export default function DemoPage() {
       <Header />
       <main className="mx-auto max-w-6xl space-y-6 p-6">
         <LaunchpadDeployBanner pipelineReady={pipelineReady} />
-        {isRuntime && String(mode).toUpperCase() === "BUNDLED" && <NimStartupProgress />}
+        {isRuntime && ["OPEN", "BUNDLED"].includes(String(mode).toUpperCase()) && <NimStartupProgress />}
 
         <DetectionPipelineExplainer deployMode={String(mode)} />
 

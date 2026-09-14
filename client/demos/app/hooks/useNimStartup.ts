@@ -23,7 +23,9 @@ const CHECK_LABELS: Record<string, string> = {
   gpu_visible: "GPU visible",
   config_applied: "Configuration applied",
   endpoints_wired: "Runtime endpoints wired",
-  nim_process_started: "Stock NIM process started",
+  model_process_started: "Model server process started",
+  model_server_ready: "Model server healthy",
+  nim_process_started: "Model server process started",
   http_ready: "HTTP health ready",
   grpc_ready: "gRPC port listening",
   models_loaded: "Models loaded",
@@ -61,7 +63,7 @@ export function useNimStartup({ poll = true, enabled = true } = {}) {
   useEffect(() => {
     if (!poll || !enabled) return;
     const ready = Boolean(data?.ready || data?.startup?.ready);
-    if (ready && data?.startup?.phase === "ready") return;
+    if (ready) return;
     const id = setInterval(() => void refresh(), 4000);
     return () => clearInterval(id);
   }, [poll, enabled, refresh, data?.ready, data?.startup?.ready, data?.startup?.phase]);
@@ -74,14 +76,14 @@ export function useNimStartup({ poll = true, enabled = true } = {}) {
     loading,
     error,
     refresh,
-    mode: data?.mode || "BUNDLED",
+    mode: data?.mode || "OPEN",
     ready: Boolean(data?.ready),
     startup,
     checkEntries,
     logTail: startup?.log_tail || [],
     elapsedSeconds: startup?.elapsed_s || 0,
     phase: startup?.phase || "unknown",
-    message: startup?.message || "Waiting for NIM status…",
+    message: startup?.message || "Waiting for model server status…",
     startupError: startup?.error,
   };
 }

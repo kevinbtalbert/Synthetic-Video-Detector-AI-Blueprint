@@ -15,15 +15,19 @@ from cai.lib.paths import CONFIG_DIR
 DEPLOYMENT_CONFIG_JSON = CONFIG_DIR / "deployment_config.json"
 APP_ENVIRONMENT_ENV = CONFIG_DIR / "app_environment.env"
 
-SECRET_KEYS: frozenset[str] = frozenset({"ngc_api_key"})
+SECRET_KEYS: frozenset[str] = frozenset({"ngc_api_key", "hf_token"})
 
 _ENV_MAP: dict[str, str] = {
     "nim_deploy_mode": "NIM_DEPLOY_MODE",
     "ngc_api_key": "NGC_API_KEY",
+    "hf_token": "HF_TOKEN",
+    "svd_hf_model_id": "SVD_HF_MODEL_ID",
+    "svd_open_model_preset": "SVD_OPEN_MODEL_PRESET",
+    "svd_open_model_kind": "SVD_OPEN_MODEL_KIND",
+    "svd_open_port": "SVD_OPEN_PORT",
     "svd_nvidia_function_id": "SVD_NVIDIA_FUNCTION_ID",
     "nvidia_serverless_grpc_host": "NVIDIA_SERVERLESS_GRPC_HOST",
     "nvidia_serverless_grpc_port": "NVIDIA_SERVERLESS_GRPC_PORT",
-    "svd_nim_manifest_profile": "NIM_MANIFEST_PROFILE",
     "detection_threshold": "SVD_DETECTION_THRESHOLD",
 }
 
@@ -32,10 +36,14 @@ _ENV_MAP: dict[str, str] = {
 class AppConfig:
     nim_deploy_mode: str = "BUNDLED"
     ngc_api_key: str = ""
+    hf_token: str = ""
+    svd_hf_model_id: str = "eftt/VideoMae-ffc23-deepfake-detector"
+    svd_open_model_preset: str = "videomae-ffc23"
+    svd_open_model_kind: str = "videomae"
+    svd_open_port: str = "8080"
     svd_nvidia_function_id: str = DEFAULT_SVD_NVCF_FUNCTION_ID
     nvidia_serverless_grpc_host: str = "grpc.nvcf.nvidia.com"
     nvidia_serverless_grpc_port: str = "443"
-    svd_nim_manifest_profile: str = ""
     detection_threshold: str = "0.30"
 
     @classmethod
@@ -47,6 +55,13 @@ class AppConfig:
         return cls(
             nim_deploy_mode=resolved_mode,
             ngc_api_key=str(os.environ.get("NGC_API_KEY", "")),
+            hf_token=str(os.environ.get("HF_TOKEN", "")),
+            svd_hf_model_id=str(
+                os.environ.get("SVD_HF_MODEL_ID", "eftt/VideoMae-ffc23-deepfake-detector")
+            ),
+            svd_open_model_preset=str(os.environ.get("SVD_OPEN_MODEL_PRESET", "videomae-ffc23")),
+            svd_open_model_kind=str(os.environ.get("SVD_OPEN_MODEL_KIND", "videomae")),
+            svd_open_port=str(os.environ.get("SVD_OPEN_PORT", "8080")),
             svd_nvidia_function_id=str(
                 os.environ.get("SVD_NVIDIA_FUNCTION_ID") or DEFAULT_SVD_NVCF_FUNCTION_ID
             ),
@@ -54,7 +69,6 @@ class AppConfig:
                 os.environ.get("NVIDIA_SERVERLESS_GRPC_HOST", "grpc.nvcf.nvidia.com")
             ),
             nvidia_serverless_grpc_port=str(os.environ.get("NVIDIA_SERVERLESS_GRPC_PORT", "443")),
-            svd_nim_manifest_profile=str(os.environ.get("NIM_MANIFEST_PROFILE", "")),
             detection_threshold=str(os.environ.get("SVD_DETECTION_THRESHOLD", "0.30")),
         )
 
@@ -64,6 +78,13 @@ class AppConfig:
         return cls(
             nim_deploy_mode=mode,
             ngc_api_key=str(data.get("ngc_api_key", "")),
+            hf_token=str(data.get("hf_token", "")),
+            svd_hf_model_id=str(
+                data.get("svd_hf_model_id", "eftt/VideoMae-ffc23-deepfake-detector")
+            ),
+            svd_open_model_preset=str(data.get("svd_open_model_preset", "videomae-ffc23")),
+            svd_open_model_kind=str(data.get("svd_open_model_kind", "videomae")),
+            svd_open_port=str(data.get("svd_open_port", "8080")),
             svd_nvidia_function_id=str(
                 data.get("svd_nvidia_function_id") or DEFAULT_SVD_NVCF_FUNCTION_ID
             ),
@@ -71,7 +92,6 @@ class AppConfig:
                 data.get("nvidia_serverless_grpc_host", "grpc.nvcf.nvidia.com")
             ),
             nvidia_serverless_grpc_port=str(data.get("nvidia_serverless_grpc_port", "443")),
-            svd_nim_manifest_profile=str(data.get("svd_nim_manifest_profile", "")),
             detection_threshold=str(data.get("detection_threshold", "0.30")),
         )
 
@@ -82,7 +102,11 @@ class AppConfig:
             "svd_nvidia_function_id": self.svd_nvidia_function_id,
             "nvidia_serverless_grpc_host": self.nvidia_serverless_grpc_host,
             "nvidia_serverless_grpc_port": self.nvidia_serverless_grpc_port,
-            "svd_nim_manifest_profile": self.svd_nim_manifest_profile,
+            "hf_token": self.hf_token,
+            "svd_hf_model_id": self.svd_hf_model_id,
+            "svd_open_model_preset": self.svd_open_model_preset,
+            "svd_open_model_kind": self.svd_open_model_kind,
+            "svd_open_port": self.svd_open_port,
             "detection_threshold": self.detection_threshold,
         }
 
@@ -104,7 +128,7 @@ class AppConfig:
         return cls.from_dict(payload)
 
     def secrets_set(self) -> dict[str, bool]:
-        return {"ngc_api_key": bool(self.ngc_api_key)}
+        return {"ngc_api_key": bool(self.ngc_api_key), "hf_token": bool(self.hf_token)}
 
     def public_dict(self) -> dict[str, Any]:
         data = self.to_dict()
@@ -144,19 +168,19 @@ class AppConfig:
         if mode not in {NIMDeployMode.BUNDLED.value, NIMDeployMode.SERVERLESS.value}:
             errors.append(f"Invalid deployment mode: {self.nim_deploy_mode}")
 
-        if not self.ngc_api_key.strip():
-            errors.append("NGC API key is required.")
-
-        if mode == NIMDeployMode.SERVERLESS.value and not self.svd_nvidia_function_id.strip():
-            errors.append("NVCF function ID is required for serverless deployment.")
-
-        if mode == NIMDeployMode.BUNDLED.value:
-            warnings.append(
-                "Bundled deployment starts NIM inside the app pod; first startup can take 15–30+ minutes."
-            )
-        else:
+        if mode == NIMDeployMode.SERVERLESS.value:
+            if not self.ngc_api_key.strip():
+                errors.append("NGC API key is required for serverless deployment.")
+            if not self.svd_nvidia_function_id.strip():
+                errors.append("NVCF function ID is required for serverless deployment.")
             warnings.append(
                 "Serverless deployment uses the NVIDIA Cloud Functions API — evaluation use only."
+            )
+        else:
+            if not self.svd_hf_model_id.strip():
+                errors.append("Hugging Face model ID is required for bundled deployment.")
+            warnings.append(
+                "First start downloads the selected Hugging Face weights into the project cache; allow several minutes on cold boot."
             )
 
         return {"valid": len(errors) == 0, "errors": errors, "warnings": warnings}
@@ -174,14 +198,15 @@ class LaunchpadConfig:
 
     @classmethod
     def from_storage(cls, data: dict[str, Any]) -> LaunchpadConfig:
-        if "serverless" in data or "bundled" in data:
+        if "serverless" in data or "open" in data or "bundled" in data:
             serverless_raw = data.get("serverless") if isinstance(data.get("serverless"), dict) else {}
             bundled_raw = data.get("bundled") if isinstance(data.get("bundled"), dict) else {}
+            if not bundled_raw and isinstance(data.get("open"), dict):
+                bundled_raw = data.get("open")
             return cls(
                 serverless=AppConfig.for_mode("SERVERLESS", serverless_raw),
                 bundled=AppConfig.for_mode("BUNDLED", bundled_raw),
             )
-        # Legacy flat deployment_config.json
         legacy = AppConfig.from_dict(data)
         if legacy.nim_deploy_mode == NIMDeployMode.SERVERLESS.value:
             return cls(serverless=legacy, bundled=AppConfig.for_mode("BUNDLED", {}))
@@ -260,7 +285,7 @@ def load_app_config() -> AppConfig | None:
     launchpad = load_launchpad_config()
     if launchpad is None:
         return None
-    if launchpad.bundled.ngc_api_key:
+    if launchpad.bundled.svd_hf_model_id:
         return launchpad.bundled
     if launchpad.serverless.ngc_api_key:
         return launchpad.serverless

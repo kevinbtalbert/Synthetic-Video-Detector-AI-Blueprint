@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import Header from "@/app/components/atoms/Header";
 import Card from "@/app/components/atoms/Card";
 import SecretInput from "@/app/components/atoms/SecretInput";
+import ModelPresetPicker from "@/app/components/atoms/ModelPresetPicker";
 import { NimStartupDetails } from "@/app/components/atoms/NimStartupProgress";
 import { useDeploymentStatus, type ServiceStatus } from "@/app/hooks/useDeploymentStatus";
+import type { OpenModelCatalog } from "@/app/lib/openModels";
 
 type DeployMode = "SERVERLESS" | "BUNDLED";
 
-type ModeForm = {
+type ServerlessForm = {
   ngc_api_key: string;
   svd_nvidia_function_id: string;
   nvidia_serverless_grpc_host: string;
@@ -17,7 +19,25 @@ type ModeForm = {
   detection_threshold: string;
 };
 
-const defaultServerless: ModeForm = {
+type BundledForm = {
+  hf_token: string;
+  svd_open_model_preset: string;
+  svd_open_model_kind: string;
+  svd_hf_model_id: string;
+  svd_open_port: string;
+  detection_threshold: string;
+};
+
+const inputClass =
+  "mt-1.5 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]";
+
+const btnSecondary =
+  "rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] transition hover:bg-neutral-800 disabled:opacity-50";
+
+const btnPrimary =
+  "rounded-lg bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-black transition hover:brightness-110 disabled:opacity-50";
+
+const defaultServerless: ServerlessForm = {
   ngc_api_key: "",
   svd_nvidia_function_id: "847b6e53-0133-452d-ab85-d7acf3ace723",
   nvidia_serverless_grpc_host: "grpc.nvcf.nvidia.com",
@@ -25,11 +45,12 @@ const defaultServerless: ModeForm = {
   detection_threshold: "0.30",
 };
 
-const defaultBundled: ModeForm = {
-  ngc_api_key: "",
-  svd_nvidia_function_id: "",
-  nvidia_serverless_grpc_host: "",
-  nvidia_serverless_grpc_port: "",
+const defaultBundled: BundledForm = {
+  hf_token: "",
+  svd_open_model_preset: "videomae-ffc23",
+  svd_open_model_kind: "videomae",
+  svd_hf_model_id: "eftt/VideoMae-ffc23-deepfake-detector",
+  svd_open_port: "8080",
   detection_threshold: "0.30",
 };
 
@@ -53,12 +74,14 @@ function DeploySection({
   onValidate,
   onDeploy,
   children,
+  showNgcKey = true,
 }: {
   mode: DeployMode;
   title: string;
   description: string;
-  form: ModeForm;
-  onChange: (patch: Partial<ModeForm>) => void;
+  form: ServerlessForm | BundledForm;
+  onChange: (patch: Partial<ServerlessForm & BundledForm>) => void;
+  showNgcKey?: boolean;
   deployment?: ServiceStatus;
   secretsSet?: boolean;
   busy: boolean;
@@ -76,50 +99,39 @@ function DeploySection({
   const starting = Boolean(app?.subdomain) && !running && !failed;
 
   return (
-    <Card title={title}>
-      <p className="mb-4 text-sm text-neutral-400">{description}</p>
-      <SecretInput
-        label="NGC API Key"
-        value={form.ngc_api_key}
-        onChange={(v) => onChange({ ngc_api_key: v })}
-        placeholder={secretsSet ? "•••••••• (saved)" : "nvapi-…"}
-      />
+    <Card title={title} description={description}>
+      {showNgcKey && "ngc_api_key" in form && (
+        <SecretInput
+          label="NGC API Key"
+          value={form.ngc_api_key}
+          onChange={(v) => onChange({ ngc_api_key: v })}
+          placeholder={secretsSet ? "•••••••• (saved)" : "nvapi-…"}
+        />
+      )}
       {children}
-      <label className="mt-4 block text-sm">
+      <label className="mt-6 block text-sm font-medium text-[var(--text-primary)]">
         Detection threshold
         <input
-          className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2"
+          className={inputClass}
           value={form.detection_threshold}
           onChange={(e) => onChange({ detection_threshold: e.target.value })}
         />
       </label>
       <div className="mt-6 flex flex-wrap gap-3">
-        <button
-          className="rounded bg-neutral-800 px-4 py-2 hover:bg-neutral-700 disabled:opacity-50"
-          disabled={busy}
-          onClick={onSave}
-        >
-          Save
+        <button type="button" className={btnSecondary} disabled={busy} onClick={onSave}>
+          Save configuration
         </button>
-        <button
-          className="rounded bg-neutral-800 px-4 py-2 hover:bg-neutral-700 disabled:opacity-50"
-          disabled={busy}
-          onClick={onValidate}
-        >
+        <button type="button" className={btnSecondary} disabled={busy} onClick={onValidate}>
           Validate
         </button>
-        <button
-          className="rounded bg-[var(--nvidia-green)] px-4 py-2 font-medium text-black hover:opacity-90 disabled:opacity-50"
-          disabled={busy}
-          onClick={onDeploy}
-        >
-          {running || ready ? "Redeploy" : "Deploy"}
+        <button type="button" className={btnPrimary} disabled={busy} onClick={onDeploy}>
+          {running || ready ? "Redeploy application" : "Deploy application"}
         </button>
       </div>
-      <div className="mt-4 space-y-1 text-sm">
+      <div className="mt-6 space-y-2 rounded-lg border border-[var(--border)] bg-black/20 p-4 text-sm">
         <p>
           Application: <strong>{deployment?.name || title}</strong> —{" "}
-          <span className={failed ? "text-red-400" : ready ? "text-green-400" : "text-neutral-300"}>
+          <span className={failed ? "text-[var(--danger)]" : ready ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"}>
             {status}
           </span>
         </p>
@@ -129,7 +141,7 @@ function DeploySection({
         {url && (
           <p>
             Open app:{" "}
-            <a href={url} target="_blank" rel="noreferrer" className="text-[var(--nvidia-green)] underline">
+            <a href={url} target="_blank" rel="noreferrer" className="font-medium text-[var(--accent)] underline">
               {url}
             </a>
           </p>
@@ -139,7 +151,7 @@ function DeploySection({
         )}
         {mode === "BUNDLED" && running && !ready && (
           <div className="mt-4 space-y-3">
-            <p className="text-amber-400">NIM is starting inside the app (first run can take 15–30+ minutes).</p>
+            <p className="text-amber-400">Model server is starting (first run downloads weights from Hugging Face).</p>
             {deployment?.nim_startup && (
               <NimStartupDetails
                 startup={deployment.nim_startup}
@@ -163,12 +175,20 @@ export default function LaunchpadPage() {
   const [busy, setBusy] = useState<DeployMode | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<OpenModelCatalog | null>(null);
+
+  useEffect(() => {
+    void fetch("/api/open-models")
+      .then((r) => r.json())
+      .then((data: OpenModelCatalog) => setCatalog(data))
+      .catch(() => setCatalog(null));
+  }, []);
 
   useEffect(() => {
     if (!status?.config || hydrated.current) return;
     hydrated.current = true;
     const sl = status.config.serverless as Record<string, unknown> | undefined;
-    const bd = status.config.bundled as Record<string, unknown> | undefined;
+    const bd = (status.config.bundled || status.config.open) as Record<string, unknown> | undefined;
     if (sl) {
       setServerlessForm((prev) => ({
         ...prev,
@@ -181,6 +201,10 @@ export default function LaunchpadPage() {
     if (bd) {
       setBundledForm((prev) => ({
         ...prev,
+        svd_open_model_preset: String(bd.svd_open_model_preset || prev.svd_open_model_preset),
+        svd_open_model_kind: String(bd.svd_open_model_kind || prev.svd_open_model_kind),
+        svd_hf_model_id: String(bd.svd_hf_model_id || prev.svd_hf_model_id),
+        svd_open_port: String(bd.svd_open_port || prev.svd_open_port),
         detection_threshold: String(bd.detection_threshold || prev.detection_threshold),
       }));
     }
@@ -190,7 +214,10 @@ export default function LaunchpadPage() {
     setBusy(mode);
     setError(null);
     setMessage(null);
-    const config = mode === "SERVERLESS" ? serverlessForm : bundledForm;
+    const config =
+      mode === "SERVERLESS"
+        ? { ...serverlessForm, nim_deploy_mode: "SERVERLESS" }
+        : { ...bundledForm, nim_deploy_mode: "BUNDLED" };
     try {
       if (action === "deploy") {
         const saveRes = await fetch("/api/deployment", {
@@ -210,11 +237,17 @@ export default function LaunchpadPage() {
       if (!res.ok) throw new Error(data.error || JSON.stringify(data.errors || data));
       if (action === "deploy") {
         setMessage(`${mode} deployment started — polling status…`);
-        setDirty((d) => ({ ...d, [mode.toLowerCase() as "serverless" | "bundled"]: false }));
+        setDirty((d) => ({
+          ...d,
+          [mode.toLowerCase() as "serverless" | "bundled"]: false,
+        }));
         void refresh();
       } else if (action === "save-config") {
         setMessage(`${mode} configuration saved.`);
-        setDirty((d) => ({ ...d, [mode.toLowerCase() as "serverless" | "bundled"]: false }));
+        setDirty((d) => ({
+          ...d,
+          [mode.toLowerCase() as "serverless" | "bundled"]: false,
+        }));
       } else {
         setMessage(data.valid ? `${mode} validation passed.` : data.errors?.join("; "));
       }
@@ -227,18 +260,32 @@ export default function LaunchpadPage() {
 
   const deployments = status?.deployments || status?.services || {};
   const slSecrets = status?.secrets_set?.serverless?.ngc_api_key;
-  const bdSecrets = status?.secrets_set?.bundled?.ngc_api_key;
+  const bundledSecrets = status?.secrets_set?.bundled?.hf_token;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[var(--page-bg)]">
       <Header />
-      <main className="mx-auto max-w-4xl space-y-6 p-6">
-        <Card title="Launchpad">
-          <p className="text-sm text-neutral-300">
-            Configure and generate standalone runtime applications. Each deploy creates a new CML app
-            with your settings baked in as environment variables — no configure step in the runtime app.
-          </p>
-          <p className="mt-2 text-sm text-neutral-500">{status?.mode_summary?.detail}</p>
+      <main className="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6">
+        <section className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-gradient-to-br from-[var(--surface)] via-[var(--surface)] to-[#0a1205] p-8 shadow-[var(--shadow-card)]">
+          <div className="relative z-10 max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent)]">Launchpad</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">
+              Deploy production-ready detection runtimes
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+              Two first-class runtimes: <strong className="text-[var(--text-primary)]">Bundled</strong> (new—HF
+              model + UI in one GPU app) and <strong className="text-[var(--text-primary)]">Serverless</strong>{" "}
+              (NVIDIA NVCF gRPC, same as release 1.6).
+            </p>
+          </div>
+          <div
+            className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-[var(--accent)]/10 blur-3xl"
+            aria-hidden
+          />
+        </section>
+
+        <Card title="Status">
+          <p className="text-sm text-[var(--text-secondary)]">{status?.mode_summary?.detail}</p>
           {buildInProgress && (
             <p className="mt-3 text-sm text-amber-400">
               Deployment in progress… {status?.build?.message || ""}
@@ -252,7 +299,7 @@ export default function LaunchpadPage() {
         <DeploySection
           mode="SERVERLESS"
           title="Deploy Serverless (NVCF)"
-          description="Creates an all-in-one CPU application that calls the NVIDIA Cloud Functions gRPC API for inference."
+          description="CPU application—streams video to the NVIDIA Synthetic Video Detector on Cloud Functions (gRPC). Same configuration model as release 1.6."
           form={serverlessForm}
           onChange={(patch) => {
             setDirty((d) => ({ ...d, serverless: true }));
@@ -266,10 +313,10 @@ export default function LaunchpadPage() {
           onDeploy={() => void post("SERVERLESS", "deploy")}
         >
           <div className="mt-4 grid gap-3">
-            <label className="text-sm">
+            <label className="text-sm font-medium text-[var(--text-primary)]">
               NVCF Function ID
               <input
-                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2"
+                className={inputClass}
                 value={serverlessForm.svd_nvidia_function_id}
                 onChange={(e) => {
                   setDirty((d) => ({ ...d, serverless: true }));
@@ -277,10 +324,10 @@ export default function LaunchpadPage() {
                 }}
               />
             </label>
-            <label className="text-sm">
+            <label className="text-sm font-medium text-[var(--text-primary)]">
               gRPC Host
               <input
-                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2"
+                className={inputClass}
                 value={serverlessForm.nvidia_serverless_grpc_host}
                 onChange={(e) => {
                   setDirty((d) => ({ ...d, serverless: true }));
@@ -288,10 +335,10 @@ export default function LaunchpadPage() {
                 }}
               />
             </label>
-            <label className="text-sm">
+            <label className="text-sm font-medium text-[var(--text-primary)]">
               gRPC Port
               <input
-                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2"
+                className={inputClass}
                 value={serverlessForm.nvidia_serverless_grpc_port}
                 onChange={(e) => {
                   setDirty((d) => ({ ...d, serverless: true }));
@@ -304,20 +351,81 @@ export default function LaunchpadPage() {
 
         <DeploySection
           mode="BUNDLED"
-          title="Deploy Bundled NIM (GPU)"
-          description="Creates an all-in-one GPU application. Bundled NIM runs inside the same pod as the detection UI."
+          title="Deploy Bundled (GPU)"
+          description="Single GPU application: curated Hugging Face model server + Detect/Demo UI in one pod (replaces legacy NIM bundle)."
           form={bundledForm}
+          showNgcKey={false}
           onChange={(patch) => {
             setDirty((d) => ({ ...d, bundled: true }));
             setBundledForm((prev) => ({ ...prev, ...patch }));
           }}
           deployment={deployments.bundled as ServiceStatus | undefined}
-          secretsSet={bdSecrets}
+          secretsSet={bundledSecrets}
           busy={busy !== null}
           onSave={() => void post("BUNDLED", "save-config")}
           onValidate={() => void post("BUNDLED", "validate")}
           onDeploy={() => void post("BUNDLED", "deploy")}
-        />
+        >
+          <div className="mt-2 space-y-6">
+            {catalog ? (
+              <ModelPresetPicker
+                catalog={catalog}
+                selectedId={bundledForm.svd_open_model_preset}
+                disabled={busy !== null}
+                onSelect={(preset) => {
+                  setDirty((d) => ({ ...d, bundled: true }));
+                  setBundledForm((prev) => ({
+                    ...prev,
+                    svd_open_model_preset: preset.id,
+                    svd_open_model_kind: preset.kind,
+                    svd_hf_model_id: preset.hf_model_id,
+                  }));
+                }}
+              />
+            ) : (
+              <p className="text-sm text-[var(--text-muted)]">Loading model catalog…</p>
+            )}
+            <SecretInput
+              label="Hugging Face token"
+              hint="Optional for public models; required for gated checkpoints."
+              value={bundledForm.hf_token}
+              onChange={(v) => {
+                setDirty((d) => ({ ...d, open: true }));
+                setBundledForm((prev) => ({ ...prev, hf_token: v }));
+              }}
+              placeholder={bundledSecrets ? "•••••••• (saved)" : "hf_…"}
+            />
+            <details className="rounded-lg border border-[var(--border)] bg-black/20 p-4">
+              <summary className="cursor-pointer text-sm font-medium text-[var(--text-secondary)]">
+                Advanced settings
+              </summary>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="text-sm font-medium text-[var(--text-primary)] sm:col-span-2">
+                  Hugging Face model ID
+                  <input
+                    className={inputClass}
+                    value={bundledForm.svd_hf_model_id}
+                    onChange={(e) => {
+                      setDirty((d) => ({ ...d, bundled: true }));
+                      setBundledForm((prev) => ({ ...prev, svd_hf_model_id: e.target.value }));
+                    }}
+                  />
+                </label>
+                <label className="text-sm font-medium text-[var(--text-primary)]">
+                  In-app model port
+                  <input
+                    className={inputClass}
+                    value={bundledForm.svd_open_port}
+                    onChange={(e) => {
+                      setDirty((d) => ({ ...d, bundled: true }));
+                      setBundledForm((prev) => ({ ...prev, svd_open_port: e.target.value }));
+                    }}
+                  />
+                </label>
+              </div>
+            </details>
+          </div>
+        </DeploySection>
       </main>
     </div>
   );

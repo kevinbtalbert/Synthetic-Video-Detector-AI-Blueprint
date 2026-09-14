@@ -27,7 +27,7 @@ function readNimStartup(): NimStartup | null {
 }
 
 export async function GET(): Promise<NextResponse> {
-  const mode = (process.env.NIM_DEPLOY_MODE || "BUNDLED").toUpperCase();
+  const mode = (process.env.NIM_DEPLOY_MODE || "OPEN").toUpperCase();
   const role = (process.env.SVD_APP_ROLE || "launchpad").toLowerCase();
   const startup = readNimStartup();
   const endpointsPath = path.join(projectRoot(), "cai/nim_endpoints.json");

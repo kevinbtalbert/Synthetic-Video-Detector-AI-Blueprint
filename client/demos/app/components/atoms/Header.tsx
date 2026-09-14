@@ -7,34 +7,47 @@ export default function Header() {
   const { isLaunchpad } = useAppRole();
 
   return (
-    <header className="flex items-center justify-between border-b border-neutral-800 bg-neutral-950/80 px-6 py-4 backdrop-blur-sm">
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500">
-          NVIDIA NIM · Cloudera AI Blueprint
-        </p>
-        <h1 className="text-xl font-semibold text-[var(--nvidia-green)]">Synthetic Video Detector</h1>
-        <p className="text-sm text-neutral-400">
-          {isLaunchpad
-            ? "Deploy bundled GPU or serverless inference apps for your project"
-            : "Clip-level AI detection for media integrity & forensics"}
-        </p>
+    <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--page-bg)]/85 backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-4 sm:px-6">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+            Media integrity · Cloudera AI
+          </p>
+          <h1 className="truncate text-xl font-semibold tracking-tight text-[var(--text-primary)]">
+            Synthetic Video Detector
+          </h1>
+          <p className="hidden text-sm text-[var(--text-secondary)] sm:block">
+            {isLaunchpad
+              ? "Deploy Bundled GPU or Serverless NVCF runtime applications"
+              : "Clip-level analysis for deepfake and synthetic media workflows"}
+          </p>
+        </div>
+        <nav className="flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 text-sm">
+          {isLaunchpad ? (
+            <Link
+              href="/demos/configure"
+              className="rounded-md px-3 py-1.5 font-medium text-[var(--text-primary)] hover:bg-[var(--surface-elevated)]"
+            >
+              Launchpad
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/demos/detect"
+                className="rounded-md px-3 py-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text-primary)]"
+              >
+                Detect
+              </Link>
+              <Link
+                href="/demos/demo"
+                className="rounded-md px-3 py-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text-primary)]"
+              >
+                Demo
+              </Link>
+            </>
+          )}
+        </nav>
       </div>
-      <nav className="flex gap-4 text-sm">
-        {isLaunchpad ? (
-          <Link href="/demos/configure" className="hover:text-[var(--nvidia-green)]">
-            Deploy
-          </Link>
-        ) : (
-          <>
-            <Link href="/demos/detect" className="hover:text-[var(--nvidia-green)]">
-              Detect
-            </Link>
-            <Link href="/demos/demo" className="hover:text-[var(--nvidia-green)]">
-              Demo
-            </Link>
-          </>
-        )}
-      </nav>
     </header>
   );
 }

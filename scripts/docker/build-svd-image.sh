@@ -1,40 +1,25 @@
 #!/usr/bin/env bash
-# Build SyntheticVideoDetector runtime image with baked NIM weights.
+# Build SyntheticVideoDetector runtime (Bundled HF + Serverless NVCF).
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${root}"
 
-source "${root}/scripts/docker/nim-gpu-arch.sh"
-
-VERSION="${SVD_RUNTIME_VERSION:-1.7}"
+VERSION="${SVD_RUNTIME_VERSION:-1.9}"
 REPO="${SVD_RUNTIME_REPO:-synthetic-video-detector}"
 REGISTRY="${SVD_RUNTIME_REGISTRY:-}"
 
-if [[ -z "${NGC_API_KEY:-}" ]]; then
-  echo "ERROR: export NGC_API_KEY before building." >&2
-  exit 1
-fi
-
-echo "Step 1/2: Prefetch model cache (optional on non-GPU hosts) ..."
-if command -v nvidia-smi >/dev/null 2>&1; then
-  "${root}/scripts/docker/prefetch-nim-model-cache.sh" || true
-fi
-
-arch="$(nim_read_gpu_arch "${root}/build/nim-model-cache" "${NIM_PREFETCH_GPU:-all}")"
-tags=("${REPO}:${VERSION}")
-[[ "${arch}" != "unknown" ]] && tags+=("${REPO}:${VERSION}-${arch}")
+tags=("${REPO}:${VERSION}" "${REPO}:${VERSION}-turing")
 if [[ -n "${REGISTRY}" ]]; then
-  tags+=("${REGISTRY}/${REPO}:${VERSION}")
-  [[ "${arch}" != "unknown" ]] && tags+=("${REGISTRY}/${REPO}:${VERSION}-${arch}")
+  tags+=("${REGISTRY}/${REPO}:${VERSION}" "${REGISTRY}/${REPO}:${VERSION}-turing")
 fi
 
-build_args=(docker build --platform linux/amd64)
+build_args=(docker build --platform linux/amd64 -f Dockerfile)
 for tag in "${tags[@]}"; do
   build_args+=(-t "${tag}")
 done
 build_args+=("$@" .)
 
-echo "Step 2/2: docker build ..."
+echo "Building SyntheticVideoDetector ${VERSION} (Bundled + Serverless) ..."
 "${build_args[@]}"
 echo "Built: ${tags[*]}"

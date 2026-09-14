@@ -51,11 +51,11 @@ export default function DetectPage() {
     detection.phase === "finalizing";
 
   return (
-    <div className="min-h-screen bg-[var(--page-bg)]">
+    <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-primary)]">
       <Header />
       <main className="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6">
         <LaunchpadDeployBanner pipelineReady={pipelineReady} />
-        {isRuntime && String(mode).toUpperCase() === "BUNDLED" && <NimStartupProgress />}
+        {isRuntime && ["OPEN", "BUNDLED"].includes(String(mode).toUpperCase()) && <NimStartupProgress />}
 
         <DetectionPipelineExplainer deployMode={String(mode)} />
 
@@ -64,8 +64,8 @@ export default function DetectPage() {
             <div className="mb-4 border-b border-neutral-800 pb-3">
               <h2 className="text-lg font-medium text-neutral-100">Input</h2>
               <p className="mt-1 text-xs text-neutral-500">
-                H.264 MP4, max 500 MB. The NIM decodes your file, runs clip-level inference, and
-                streams scores back over gRPC.
+                MP4 input. Clip-level scores and aggregate synthetic probability are produced by
+                your deployed runtime (open-weights in-pod model server or optional cloud mode).
               </p>
             </div>
 
@@ -112,11 +112,11 @@ export default function DetectPage() {
               disabled={!file || detection.busy || !canRunDetection}
               onClick={() => file && void detection.runDetection(file)}
             >
-              {detection.busy ? "Running NVIDIA SVD…" : "Run detection"}
+              {detection.busy ? "Running detection…" : "Run detection"}
             </button>
             {!canRunDetection && file && (
               <p className="mt-3 text-sm text-amber-400/90">
-                Waiting for the deployed runtime application (NIM + UI) to become ready…
+                Waiting for the deployed runtime application (model server + UI) to become ready…
               </p>
             )}
             {detection.error && <p className="mt-3 text-sm text-red-400">{detection.error}</p>}
