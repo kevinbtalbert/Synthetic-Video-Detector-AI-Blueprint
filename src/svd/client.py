@@ -153,10 +153,13 @@ def detect_video(
                             "message": "Analyzing video clips…",
                         }
                     )
+                score = _expit(clip.logit)
                 on_progress(
                     {
                         "type": "clip",
                         "index": clip.index,
+                        "logit": clip.logit,
+                        "score": round(score, 4),
                         "clips_done": len(clip_results),
                     }
                 )

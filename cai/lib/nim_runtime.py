@@ -22,8 +22,10 @@ RUN_BUNDLED_NIM_IMAGE = Path("/usr/local/bin/run-bundled-nim")
 
 SVD_NIM_ENV_KEYS = (
     "NGC_API_KEY",
+    "NIM_HTTP_API_HOST",
     "NIM_HTTP_API_PORT",
     "NIM_GRPC_API_PORT",
+    "GRPC_SERVICE_URI",
     "NIM_MANIFEST_PROFILE",
     "NIM_MODEL_PROFILE",
     "NIM_MAX_CONCURRENCY_PER_GPU",
@@ -129,6 +131,12 @@ def _nim_log_has_fatal_error() -> str | None:
         if "ERROR: wrapt install" in stripped:
             return stripped
         if stripped.startswith("ERROR:"):
+            if "0.0.0.0" in stripped and "8000" in stripped and "already in use" in stripped:
+                return (
+                    "NIM tried to bind 0.0.0.0:8000 while HTTP is already up — stock gRPC "
+                    "startup likely ran instead of bundled-svd-grpc-start.sh (127.0.0.1). "
+                    "Sync repo + redeploy, or rebuild runtime 1.6+ with baked start_service shim."
+                )
             return stripped
         if "Can not combine '--user' and '--target'" in stripped:
             return "NIM bootstrap failed installing python deps (pip --user vs --target conflict)"
@@ -266,8 +274,14 @@ def _resolve_nim_profile() -> str:
 
 
 def configure_svd_env() -> dict[str, Any]:
+    os.environ.setdefault("NIM_HTTP_API_HOST", "127.0.0.1")
     os.environ.setdefault("NIM_HTTP_API_PORT", str(SVD_DEFAULTS["http_port"]))
     os.environ.setdefault("NIM_GRPC_API_PORT", str(SVD_DEFAULTS["grpc_port"]))
+    os.environ.setdefault(
+        "GRPC_SERVICE_URI",
+        f"127.0.0.1:{os.environ['NIM_GRPC_API_PORT']}",
+    )
+    os.environ.setdefault("NIM_DISABLE_GRPC_STARTUP", "1")
     os.environ.setdefault("NVIDIA_DRIVER_CAPABILITIES", "all")
     os.environ.setdefault("MAXINE_MAX_INPUT_FILE_SIZE_MB", "500")
     profile = _resolve_nim_profile()

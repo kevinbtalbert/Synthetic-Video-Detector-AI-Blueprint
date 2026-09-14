@@ -5,9 +5,9 @@ import { useDropzone } from "react-dropzone";
 import Header from "@/app/components/atoms/Header";
 import LaunchpadDeployBanner from "@/app/components/atoms/LaunchpadDeployBanner";
 import NimStartupProgress from "@/app/components/atoms/NimStartupProgress";
-import Card from "@/app/components/atoms/Card";
+import DetectionPipelineExplainer from "@/app/components/atoms/DetectionPipelineExplainer";
 import DetectionProgress from "@/app/components/atoms/DetectionProgress";
-import DetectionResultSummary from "@/app/components/atoms/DetectionResultSummary";
+import DetectionResultsPanel from "@/app/components/atoms/DetectionResultsPanel";
 import { useVideoDetection } from "@/app/hooks/useVideoDetection";
 import { useAppRole } from "@/app/hooks/useAppRole";
 import { resolveDeployMode, useDeploymentStatus } from "@/app/hooks/useDeploymentStatus";
@@ -18,6 +18,8 @@ export default function DetectPage() {
   const canRunDetection = isRuntime || pipelineReady;
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  const [playhead, setPlayhead] = useState(0);
   const detection = useVideoDetection();
 
   const onDrop = useCallback(
@@ -26,9 +28,11 @@ export default function DetectPage() {
       if (!f) return;
       setFile(f);
       setPreview(URL.createObjectURL(f));
+      setVideoDuration(null);
+      setPlayhead(0);
       detection.reset();
     },
-    [detection.reset],
+    [detection],
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -40,64 +44,95 @@ export default function DetectPage() {
   });
 
   const mode = resolveDeployMode(status);
+  const analyzing =
+    detection.busy ||
+    detection.phase === "analyzing" ||
+    detection.phase === "connecting" ||
+    detection.phase === "finalizing";
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[var(--page-bg)]">
       <Header />
-      <main className="mx-auto max-w-4xl space-y-6 p-6">
+      <main className="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6">
         <LaunchpadDeployBanner pipelineReady={pipelineReady} />
         {isRuntime && String(mode).toUpperCase() === "BUNDLED" && <NimStartupProgress />}
 
-        <Card title="Upload video">
-          <p className="text-sm text-neutral-400 mb-4">
-            H.264 MP4 only, max 500 MB. Mode: <strong>{String(mode)}</strong>
-          </p>
-          <div
-            {...getRootProps()}
-            className={`cursor-pointer rounded border-2 border-dashed p-10 text-center ${
-              isDragActive ? "border-[var(--nvidia-green)]" : "border-neutral-700"
-            } ${detection.busy ? "pointer-events-none opacity-60" : ""}`}
-          >
-            <input {...getInputProps()} />
-            {file ? file.name : "Drop MP4 here or click to browse"}
-          </div>
-          {preview && (
-            <video src={preview} controls className="mt-4 w-full max-h-80 rounded bg-black" />
-          )}
+        <DetectionPipelineExplainer deployMode={String(mode)} />
 
-          <DetectionProgress
-            phase={detection.phase}
-            message={detection.progressMessage}
-            clipsDone={detection.clipsDone}
-            totalClips={detection.totalClips}
-            elapsedSeconds={detection.elapsedSeconds}
-          />
+        <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
+          <section className="rounded-xl border border-neutral-800 bg-neutral-950 p-6">
+            <div className="mb-4 border-b border-neutral-800 pb-3">
+              <h2 className="text-lg font-medium text-neutral-100">Input</h2>
+              <p className="mt-1 text-xs text-neutral-500">
+                H.264 MP4, max 500 MB. The NIM decodes your file, runs clip-level inference, and
+                streams scores back over gRPC.
+              </p>
+            </div>
 
-          <button
-            className="mt-4 rounded bg-[var(--nvidia-green)] px-4 py-2 font-medium text-black disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!file || detection.busy || !canRunDetection}
-            onClick={() => file && void detection.runDetection(file)}
-          >
-            {detection.busy ? "Detection in progress…" : "Run detection"}
-          </button>
-          {!canRunDetection && file && (
-            <p className="mt-2 text-sm text-amber-400">
-              Waiting for the deployed runtime application to become ready…
-            </p>
-          )}
-        </Card>
+            <div
+              {...getRootProps()}
+              className={`cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
+                isDragActive
+                  ? "border-[var(--nvidia-green)] bg-[var(--nvidia-green)]/5"
+                  : "border-neutral-700 hover:border-neutral-600"
+              } ${detection.busy ? "pointer-events-none opacity-60" : ""}`}
+            >
+              <input {...getInputProps()} />
+              <p className="text-sm text-neutral-300">
+                {file ? file.name : "Drop MP4 here or click to browse"}
+              </p>
+              {!file && (
+                <p className="mt-2 text-xs text-neutral-500">
+                  Tip: try a short clip first while the GPU model warms up.
+                </p>
+              )}
+            </div>
 
-        {detection.error && <p className="text-red-400">{detection.error}</p>}
+            {preview && (
+              <video
+                src={preview}
+                controls
+                className="mt-4 w-full max-h-72 rounded-lg bg-black ring-1 ring-neutral-800"
+                onLoadedMetadata={(e) => setVideoDuration(e.currentTarget.duration)}
+                onTimeUpdate={(e) => setPlayhead(e.currentTarget.currentTime)}
+              />
+            )}
 
-        {detection.result && (
-          <Card title="Detection summary">
-            <DetectionResultSummary result={detection.result} />
-            <p className="text-sm text-neutral-500 mt-4">
-              Higher scores indicate stronger evidence of AI-generated content. Scores above the
-              threshold are classified as synthetic.
-            </p>
-          </Card>
-        )}
+            <DetectionProgress
+              phase={detection.phase}
+              message={detection.progressMessage}
+              clipsDone={detection.clipsDone}
+              totalClips={detection.totalClips}
+              elapsedSeconds={detection.elapsedSeconds}
+            />
+
+            <button
+              type="button"
+              className="mt-5 w-full rounded-lg bg-[var(--nvidia-green)] px-4 py-3 text-sm font-semibold text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              disabled={!file || detection.busy || !canRunDetection}
+              onClick={() => file && void detection.runDetection(file)}
+            >
+              {detection.busy ? "Running NVIDIA SVD…" : "Run detection"}
+            </button>
+            {!canRunDetection && file && (
+              <p className="mt-3 text-sm text-amber-400/90">
+                Waiting for the deployed runtime application (NIM + UI) to become ready…
+              </p>
+            )}
+            {detection.error && <p className="mt-3 text-sm text-red-400">{detection.error}</p>}
+          </section>
+
+          <section className="rounded-xl border border-neutral-800 bg-neutral-950 p-6 lg:min-h-[520px]">
+            <DetectionResultsPanel
+              result={detection.result}
+              clipSeriesLive={detection.clipSeriesLive}
+              threshold={0.3}
+              analyzing={analyzing}
+              videoDurationSec={videoDuration}
+              playheadSec={playhead}
+            />
+          </section>
+        </div>
       </main>
     </div>
   );

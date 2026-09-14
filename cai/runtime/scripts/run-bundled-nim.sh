@@ -118,6 +118,8 @@ configure_nim_image_env() {
   export SYNTHETIC_DETECTOR_ROOT="${SYNTHETIC_DETECTOR_ROOT:-/opt/synthetic-detector}"
   export NIM_HTTP_API_PORT="${NIM_HTTP_API_PORT:-8000}"
   export NIM_GRPC_API_PORT="${NIM_GRPC_API_PORT:-8001}"
+  # All-in-one CAI pod: loopback only (stock NIM defaults to 0.0.0.0 and double-binds :8000).
+  export NIM_HTTP_API_HOST="${NIM_HTTP_API_HOST:-127.0.0.1}"
   export GRPC_SERVICE_URI="${GRPC_SERVICE_URI:-127.0.0.1:${NIM_GRPC_API_PORT}}"
 }
 
@@ -280,6 +282,10 @@ install_bundled_grpc_start() {
   }
   cp "${shim_src}" "${target}"
   chmod u=rx,go=rx "${target}" 2>/dev/null || chmod +x "${target}"
+  if ! grep -q '127.0.0.1' "${target}"; then
+    echo "ERROR: gRPC start shim missing localhost bind in ${target}" >&2
+    exit 1
+  fi
   echo "Installed bundled gRPC start (${GRPC_SERVICE_URI}) → ${target}"
 }
 install_bundled_grpc_start
@@ -299,6 +305,7 @@ export NIM_CACHE_DIR="/opt/nim/.cache"
 export NIM_CACHE_PATH="${NIM_CACHE_PATH}"
 export NIM_HTTP_API_PORT="${NIM_HTTP_API_PORT}"
 export NIM_GRPC_API_PORT="${NIM_GRPC_API_PORT}"
+export NIM_HTTP_API_HOST="${NIM_HTTP_API_HOST}"
 export GRPC_SERVICE_URI="${GRPC_SERVICE_URI}"
 export NIM_DISABLE_GRPC_STARTUP="${NIM_DISABLE_GRPC_STARTUP}"
 export NIM_DIR_PATH="${NIM_DIR_PATH}"
@@ -324,6 +331,7 @@ EOF
 chmod +x "${launch_wrapper}"
 
 echo "Starting bundled ${nim_type} NIM"
+echo "  NIM_HTTP_API_HOST=${NIM_HTTP_API_HOST} NIM_HTTP_API_PORT=${NIM_HTTP_API_PORT}"
 echo "  GRPC_SERVICE_URI=${GRPC_SERVICE_URI} (localhost gRPC for in-pod detect)"
 echo "  NIM_DISABLE_GRPC_STARTUP=${NIM_DISABLE_GRPC_STARTUP} (HTTP via nimlib; gRPC via start_service.sh)"
 echo "  NVCF_MODELS_DIR=${NVCF_MODELS_DIR}"

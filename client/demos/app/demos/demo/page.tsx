@@ -5,7 +5,7 @@ import Header from "@/app/components/atoms/Header";
 import LaunchpadDeployBanner from "@/app/components/atoms/LaunchpadDeployBanner";
 import NimStartupProgress from "@/app/components/atoms/NimStartupProgress";
 import { useAppRole } from "@/app/hooks/useAppRole";
-import Card from "@/app/components/atoms/Card";
+import DetectionPipelineExplainer from "@/app/components/atoms/DetectionPipelineExplainer";
 import SampleDetectionPanel, {
   type SampleVideo,
 } from "@/app/components/atoms/SampleDetectionPanel";
@@ -40,10 +40,13 @@ export default function DemoPage() {
         <LaunchpadDeployBanner pipelineReady={pipelineReady} />
         {isRuntime && String(mode).toUpperCase() === "BUNDLED" && <NimStartupProgress />}
 
-        <Card title="Demo">
+        <DetectionPipelineExplainer deployMode={String(mode)} />
+
+        <section className="rounded-xl border border-neutral-800 bg-neutral-950 p-6">
+          <h2 className="mb-2 text-lg font-medium">Side-by-side samples</h2>
           <p className="mb-6 text-sm text-neutral-400">
-            Compare detection on bundled real and synthetic sample videos. Mode:{" "}
-            <strong>{String(mode)}</strong>
+            Run the same pipeline NVIDIA publishes on build.nvidia.com—compare expected real vs
+            synthetic outcomes, then inspect the timeline chart for each clip.
           </p>
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -63,7 +66,7 @@ export default function DemoPage() {
             </Link>{" "}
             tab.
           </p>
-        </Card>
+        </section>
       </main>
     </div>
   );

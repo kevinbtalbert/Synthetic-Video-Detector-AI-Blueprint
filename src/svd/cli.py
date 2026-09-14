@@ -18,7 +18,7 @@ if str(ROOT) in sys.path:
     sys.path.remove(str(ROOT))
 sys.path.insert(0, str(ROOT))
 
-from src.svd.client import detect_video  # noqa: E402
+from src.svd.client import _expit, detect_video  # noqa: E402
 
 
 def main() -> int:
@@ -40,6 +40,10 @@ def main() -> int:
         args.video_input,
         on_progress=emit_progress if args.progress_jsonl else None,
     )
+    clip_series = [
+        {"index": clip.index, "logit": clip.logit, "score": round(_expit(clip.logit), 4)}
+        for clip in result.clip_results
+    ]
     payload = {
         "probability": result.probability,
         "logit": result.logit,
@@ -47,6 +51,8 @@ def main() -> int:
         "is_synthetic": result.is_synthetic,
         "total_clips": result.total_clips,
         "threshold": 0.30,
+        "clip_series": clip_series,
+        "csv_data": result.csv_data,
     }
     if args.progress_jsonl:
         print(json.dumps({"type": "result", **payload}), flush=True)

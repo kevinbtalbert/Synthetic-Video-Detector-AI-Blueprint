@@ -10,6 +10,8 @@ import {
   validateDetectEnv,
 } from "../utils/persistedConfig";
 
+type ClipPoint = { index: number; logit: number; score: number };
+
 type DetectPayload = {
   probability: number;
   logit: number;
@@ -17,6 +19,8 @@ type DetectPayload = {
   is_synthetic: boolean;
   total_clips: number;
   threshold: number;
+  clip_series?: ClipPoint[];
+  csv_data?: string;
 };
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -117,7 +121,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               return;
             }
             const result = JSON.parse(await fs.readFile(jsonPath, "utf8")) as DetectPayload;
-            emit({ type: "done", ...result, threshold: result.threshold ?? 0.3 });
+            emit({
+              type: "done",
+              ...result,
+              threshold: result.threshold ?? 0.3,
+              clip_series: result.clip_series ?? [],
+            });
           } catch (err) {
             emit({
               type: "error",

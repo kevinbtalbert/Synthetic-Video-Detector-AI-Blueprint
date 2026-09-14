@@ -17,11 +17,11 @@ type Props = {
   elapsedSeconds: number;
 };
 
-const STEPS: Array<{ id: DetectPhase; label: string }> = [
-  { id: "uploading", label: "Upload" },
-  { id: "connecting", label: "Connect" },
-  { id: "analyzing", label: "Analyze" },
-  { id: "finalizing", label: "Summarize" },
+const STEPS: Array<{ id: DetectPhase; label: string; hint: string }> = [
+  { id: "uploading", label: "Upload", hint: "Video sent to the app" },
+  { id: "connecting", label: "Connect", hint: "gRPC session to NIM" },
+  { id: "analyzing", label: "Analyze", hint: "Clip scores streaming" },
+  { id: "finalizing", label: "Summarize", hint: "Aggregate probability" },
 ];
 
 function stepIndex(phase: DetectPhase): number {
@@ -49,12 +49,17 @@ export default function DetectionProgress({
         ? `${clipsDone} clips analyzed`
         : null;
 
+  const activeHint = active >= 0 ? STEPS[active]?.hint : "";
+
   return (
-    <div className="mt-4 rounded border border-neutral-700 bg-neutral-900/60 p-4">
-      <div className="mb-3 flex items-center justify-between text-sm">
+    <div className="mt-4 rounded-lg border border-neutral-700/80 bg-neutral-900/60 p-4">
+      <div className="mb-1 flex items-center justify-between text-sm">
         <span className="font-medium text-[var(--nvidia-green)]">{message || "Working…"}</span>
         <span className="text-neutral-500">{elapsedSeconds}s</span>
       </div>
+      {activeHint && phase !== "done" && (
+        <p className="mb-3 text-xs text-neutral-500">{activeHint}</p>
+      )}
 
       <div className="mb-3 h-2 overflow-hidden rounded-full bg-neutral-800">
         <div
@@ -85,7 +90,7 @@ export default function DetectionProgress({
                     : "text-neutral-600"
               }
             >
-              {done ? "✓" : current ? "◌" : "○"} {step.label}
+              {done ? "✓" : current ? "●" : "○"} {step.label}
             </li>
           );
         })}

@@ -71,6 +71,9 @@ RUN mkdir -p /opt/nim \
     chown cdsw:cdsw /usr/local/bin/run-bundled-nim /usr/local/bin/prepare-bundled-nim-models /usr/local/bin/bundled-svd-grpc-start && \
     chmod u=rwx,go=rx /usr/local/bin/run-bundled-nim /usr/local/bin/prepare-bundled-nim-models /usr/local/bin/bundled-svd-grpc-start && \
     test -x "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/synthetic-detector/src/grpc/start_service.sh" && \
+    cp /usr/local/bin/bundled-svd-grpc-start \
+      "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/synthetic-detector/src/grpc/start_service.sh" && \
+    grep -q '127.0.0.1' "${NIM_BUNDLE_ROOT}/synthetic-video-detector/opt/synthetic-detector/src/grpc/start_service.sh" && \
     if [ -x "${NIM_BUNDLE_ROOT}/synthetic-video-detector/usr/local/bin/python3.12" ]; then \
       "${NIM_BUNDLE_ROOT}/synthetic-video-detector/usr/local/bin/python3.12" -m pip install \
         --no-cache-dir --disable-pip-version-check --no-user --isolated --break-system-packages \

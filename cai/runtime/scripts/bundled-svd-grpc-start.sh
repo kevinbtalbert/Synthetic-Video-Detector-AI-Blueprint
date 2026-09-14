@@ -4,7 +4,8 @@ set -e
 
 echo "=== Synthetic Video Detector gRPC Service Startup (bundled) ==="
 
-# Stock NGC script uses 0.0.0.0; CAI all-in-one pod uses loopback only.
+# Stock start_service.sh re-runs full inference (HTTP 0.0.0.0:8000) after nimlib already
+# bound :8000 — address in use. This shim starts gRPC on loopback only.
 GRPC_SERVICE_URI="${GRPC_SERVICE_URI:-127.0.0.1:${NIM_GRPC_API_PORT:-8001}}"
 GRPC_MAX_CONCURRENCY="${GRPC_MAX_CONCURRENCY:-1}"
 GRPC_MESSAGE_SIZE="${GRPC_MESSAGE_SIZE:-67108864}"
