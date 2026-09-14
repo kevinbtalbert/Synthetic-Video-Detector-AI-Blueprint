@@ -5,7 +5,7 @@ description: |
   Serverless or Bundled NIM runtime applications.
 author: Cloudera
 specification_version: 1.0
-prototype_version: 1.5
+prototype_version: 1.6
 date: "2026-09-10"
 shared_memory_limit: 8
 
@@ -13,7 +13,7 @@ runtimes:
   - editor: JupyterLab
     kernel: Python 3.13
     edition: SyntheticVideoDetector
-    version: "1.5"
+    version: "1.6"
 
 tasks:
   - type: run_session

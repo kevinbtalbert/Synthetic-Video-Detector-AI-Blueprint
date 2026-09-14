@@ -6,7 +6,7 @@ entries:
       Deploy NVIDIA Synthetic Video Detector on Cloudera AI Workbench with
       bundled NIM GPU application or serverless NVCF API, plus a Next.js Launchpad UI.
     long_description: |
-      Requires the custom runtime **SyntheticVideoDetector** v1.5
+      Requires the custom runtime **SyntheticVideoDetector** v1.6
       (build the repository root Dockerfile with NGC login for nvcr.io, then register).
       Bundled mode embeds the Synthetic Video Detector NIM in a single runtime image.
       Serverless mode uses the NVIDIA Cloud Functions gRPC API (no local GPU required).

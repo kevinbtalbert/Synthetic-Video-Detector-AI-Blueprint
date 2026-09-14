@@ -7,9 +7,9 @@ amp_runtime_match:
   editor: JupyterLab
   kernel: Python 3.13
   edition: SyntheticVideoDetector
-  version: "1.5"
+  version: "1.6"
 
-docker_image_example: "docker.io/<your-user>/synthetic-video-detector:1.5-turing"
+docker_image_example: "docker.io/<your-user>/synthetic-video-detector:1.6-turing"
 
 description: |
   Single Docker image for NVIDIA Synthetic Video Detector on Cloudera AI Workbench.
