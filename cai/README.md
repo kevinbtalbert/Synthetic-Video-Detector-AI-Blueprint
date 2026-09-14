@@ -65,7 +65,7 @@ From Launchpad: configure → deploy Serverless and/or Bundled runtime apps.
 ## Bundled NIM ports (in pod)
 
 - HTTP health: `8000`
-- gRPC inference: `8001`
+- gRPC inference: `8001` (requires GStreamer in runtime — see `nim-gstreamer-env.sh`)
 
 ## Troubleshooting
 

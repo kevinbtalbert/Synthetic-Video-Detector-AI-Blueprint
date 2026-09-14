@@ -7,7 +7,7 @@ cd "${root}"
 
 source "${root}/scripts/docker/nim-gpu-arch.sh"
 
-VERSION="${SVD_RUNTIME_VERSION:-1.6}"
+VERSION="${SVD_RUNTIME_VERSION:-1.7}"
 REPO="${SVD_RUNTIME_REPO:-synthetic-video-detector}"
 REGISTRY="${SVD_RUNTIME_REGISTRY:-}"
 

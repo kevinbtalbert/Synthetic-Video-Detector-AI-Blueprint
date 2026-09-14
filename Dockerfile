@@ -18,6 +18,19 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl wget jq git ca-certificates \
+        ffmpeg \
+        gstreamer1.0-tools \
+        gstreamer1.0-plugins-base \
+        gstreamer1.0-plugins-good \
+        gstreamer1.0-plugins-bad \
+        gstreamer1.0-libav \
+        gstreamer1.0-plugins-ugly \
+        gstreamer1.0-x \
+        libgstreamer1.0-0 \
+        libgstreamer-plugins-base1.0-0 \
+        libgstreamer-plugins-good1.0-0 \
+        gir1.2-gstreamer-1.0 \
+        gir1.2-gst-plugins-base-1.0 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -29,9 +42,15 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
 COPY scripts/docker/record-nim-bundle-entrypoint.sh /tmp/record-nim-bundle-entrypoint.sh
 COPY scripts/docker/copy-nim-bundle.sh /tmp/copy-nim-bundle.sh
 COPY scripts/docker/install-nim-runtime-stubs.sh /tmp/install-nim-runtime-stubs.sh
-RUN chmod +x /tmp/record-nim-bundle-entrypoint.sh /tmp/copy-nim-bundle.sh /tmp/install-nim-runtime-stubs.sh
+COPY scripts/docker/install-nim-gstreamer.sh /tmp/install-nim-gstreamer.sh
+COPY scripts/docker/verify-nim-video-decode.sh /tmp/verify-nim-video-decode.sh
+RUN chmod +x /tmp/record-nim-bundle-entrypoint.sh /tmp/copy-nim-bundle.sh /tmp/install-nim-runtime-stubs.sh /tmp/install-nim-gstreamer.sh /tmp/verify-nim-video-decode.sh
+COPY cai/runtime/scripts/nim-gstreamer-env.sh /tmp/nim-gstreamer-env.sh
 RUN --mount=from=nim-svd,source=/,target=/nim-src,readonly \
-    bash /tmp/copy-nim-bundle.sh /nim-src "${NIM_BUNDLE_ROOT}/synthetic-video-detector" synthetic-video-detector /tmp/record-nim-bundle-entrypoint.sh
+    bash /tmp/copy-nim-bundle.sh /nim-src "${NIM_BUNDLE_ROOT}/synthetic-video-detector" synthetic-video-detector /tmp/record-nim-bundle-entrypoint.sh && \
+    cp /tmp/nim-gstreamer-env.sh /usr/local/bin/nim-gstreamer-env.sh && \
+    chmod u=rx,go=rx /usr/local/bin/nim-gstreamer-env.sh && \
+    bash /tmp/install-nim-gstreamer.sh "${NIM_BUNDLE_ROOT}/synthetic-video-detector"
 
 COPY build/nim-model-cache/synthetic-video-detector /opt/nvidia-nim/baked-model-cache/synthetic-video-detector
 RUN mkdir -p /opt/nvidia-nim/baked-model-cache/synthetic-video-detector && \
@@ -84,13 +103,13 @@ USER cdsw
 WORKDIR ${APP_ROOT}
 
 # Runtime catalog metadata (Cloudera custom-runtime convention).
-# short.maintenance → full version (e.g. 1.6.0). AMP matches on short version (1.6).
+# short.maintenance → full version (e.g. 1.7.0). AMP matches on short version (1.7).
 # Bump ML_RUNTIME_MAINTENANCE_VERSION on each repush to register a new catalog entry.
 ENV ML_RUNTIME_EDITION="SyntheticVideoDetector" \
     ML_RUNTIME_EDITOR="JupyterLab" \
     ML_RUNTIME_KERNEL="Python 3.13" \
-    ML_RUNTIME_SHORT_VERSION="1.6" \
-    ML_RUNTIME_MAINTENANCE_VERSION="0" \
+    ML_RUNTIME_SHORT_VERSION="1.7" \
+    ML_RUNTIME_MAINTENANCE_VERSION="2" \
     ML_RUNTIME_DESCRIPTION="JupyterLab Runtime with NVIDIA Synthetic Video Detector NIM"
 
 ENV ML_RUNTIME_FULL_VERSION="${ML_RUNTIME_SHORT_VERSION}.${ML_RUNTIME_MAINTENANCE_VERSION}"

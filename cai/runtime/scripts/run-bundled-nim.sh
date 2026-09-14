@@ -46,6 +46,9 @@ if [[ "${NVIDIA_VISIBLE_DEVICES:-}" == "void" || "${NVIDIA_VISIBLE_DEVICES:-}" =
   fi
 fi
 
+# media_utils H.264 path uses DeepStream nvv4l2decoder (needs video driver caps on the worker).
+export NVIDIA_DRIVER_CAPABILITIES="${NVIDIA_DRIVER_CAPABILITIES:-compute,utility,video}"
+
 shm_mb="$(df -m /dev/shm 2>/dev/null | awk 'NR==2 {print $2}' || echo 0)"
 if [[ "${shm_mb}" =~ ^[0-9]+$ ]] && (( shm_mb < 4096 )); then
   echo "ERROR: /dev/shm is only ${shm_mb}M — SVD NIM needs ~4–8 GB." >&2
@@ -297,6 +300,11 @@ launch_wrapper="/opt/nim/.bundled_nim_launch_${nim_type}.sh"
 cat >"${launch_wrapper}" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ -f /usr/local/bin/nim-gstreamer-env.sh ]]; then
+  source /usr/local/bin/nim-gstreamer-env.sh
+elif [[ -f "${CDSW_PROJECT_DIR:-}/cai/runtime/scripts/nim-gstreamer-env.sh" ]]; then
+  source "${CDSW_PROJECT_DIR}/cai/runtime/scripts/nim-gstreamer-env.sh"
+fi
 export PYTHONNOUSERSITE=1
 export PYTHONPATH="${nim_pythonpath}"
 export PATH="${PATH}"

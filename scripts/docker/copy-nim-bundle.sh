@@ -23,6 +23,7 @@ mkdir -p "${dest}"
 for rel in \
   opt/nim \
   opt/nvidia \
+  opt/nvidia/deepstream \
   opt/tritonserver \
   opt/synthetic-detector \
   opt/maxine \
@@ -32,6 +33,17 @@ for rel in \
   usr/lib64 \
   lib \
   lib64; do
+  copy_tree "${rel}"
+done
+
+# GStreamer typelibs + plugins (media_utils VideoReader requires Gst GI namespace).
+for rel in \
+  usr/lib/x86_64-linux-gnu/gstreamer-1.0 \
+  usr/lib/x86_64-linux-gnu/girepository-1.0 \
+  usr/lib/gstreamer-1.0 \
+  usr/lib/girepository-1.0 \
+  lib/x86_64-linux-gnu/gstreamer-1.0 \
+  usr/libexec/gstreamer-1.0; do
   copy_tree "${rel}"
 done
 

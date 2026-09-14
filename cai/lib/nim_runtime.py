@@ -130,6 +130,11 @@ def _nim_log_has_fatal_error() -> str | None:
             return stripped
         if "ERROR: wrapt install" in stripped:
             return stripped
+        if "Namespace Gst not available" in stripped or "Namespace Gst not available" in line:
+            return (
+                "GStreamer (Gst) is not available in the runtime image — rebuild "
+                "SyntheticVideoDetector 1.7.1+ with GStreamer packages and nim-gstreamer-env."
+            )
         if stripped.startswith("ERROR:"):
             if "0.0.0.0" in stripped and "8000" in stripped and "already in use" in stripped:
                 return (
