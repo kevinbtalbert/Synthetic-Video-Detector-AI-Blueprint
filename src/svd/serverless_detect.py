@@ -8,7 +8,7 @@ from typing import Callable, Iterator
 
 import grpc
 
-from src.svd.client import CLASSIFICATION_THRESHOLD, ClipResult, DetectionResult, _expit
+from src.svd.client import ClipResult, DetectionResult, _expit, classification_threshold
 from src.svd.patch_grpc_stub import ensure_grpc_stub
 
 ensure_grpc_stub()
@@ -143,6 +143,6 @@ def detect_video_serverless(
         total_clips=total_clips,
         csv_data=csv_data,
         clip_results=clip_results,
-        is_synthetic=score >= CLASSIFICATION_THRESHOLD,
+        is_synthetic=score >= classification_threshold(),
         synthetic_score_percent=round(score * 100, 1),
     )

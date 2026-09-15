@@ -7,11 +7,12 @@
       "subtitle": "Temporal video model · FaceForensics++",
       "hf_model_id": "eftt/VideoMae-ffc23-deepfake-detector",
       "kind": "videomae",
-      "recommended": true,
+      "aggregate": "median",
+      "recommended": false,
       "vram_gb": 8,
-      "tags": ["Video-native", "Binary real/fake"],
-      "summary": "Fine-tuned VideoMAE that uses 16 frames per clip to catch temporal manipulation cues image models miss.",
-      "metrics_hint": "~88% accuracy · 0.84 AUC on FF++ subset (per model card)",
+      "tags": ["Video-native", "Binary real/fake", "Research / FF++"],
+      "summary": "Community VideoMAE fine-tuned on FaceForensics++—best for demos and offline GPU use. Expect domain shift vs full-scene consumer MP4; for NVIDIA-calibrated production scoring use Serverless (NVCF).",
+      "metrics_hint": "~88% on FF++ (model card)—not equivalent to NVIDIA Synthetic Video Detector NIM",
       "hf_url": "https://huggingface.co/eftt/VideoMae-ffc23-deepfake-detector"
     },
     {

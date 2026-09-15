@@ -1,6 +1,6 @@
 [project]
 name = "synthetic-video-detector"
-version = "1.10.0"
+version = "1.12.0"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.12"
@@ -16,10 +16,12 @@ test = ["pytest>=8.0"]
 lint = ["ruff>=0.9"]
 open = [
     "torch>=2.2",
+    "torchvision>=0.17",
     "transformers>=4.40",
     "accelerate>=0.30",
     "opencv-python-headless>=4.9",
     "fastapi>=0.110",
+    "python-multipart>=0.0.9",
     "uvicorn[standard]>=0.29",
     "pillow>=10.0",
 ]

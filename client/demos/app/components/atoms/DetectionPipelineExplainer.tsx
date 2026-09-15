@@ -60,8 +60,8 @@ export default function DetectionPipelineExplainer({ deployMode }: { deployMode:
       </div>
       <p className="mb-6 max-w-3xl text-sm leading-relaxed text-[var(--text-secondary)]">
         {bundled
-          ? "Bundled runtimes run entirely in your project: pick a Hugging Face preset, deploy one GPU app, and use Detect/Demo on the generated URL."
-          : "Serverless runtimes use your NGC credentials to call NVIDIA-hosted Synthetic Video Detector inference—no local GPU."}
+          ? "Bundled runtimes run Hugging Face presets in your GPU pod (research / offline). Scores are not calibrated to the NVIDIA Synthetic Video Detector NIM—use Serverless when you need the same behavior as release 1.6."
+          : "Serverless runtimes use your NGC credentials to call NVIDIA-hosted Synthetic Video Detector inference—the production-calibrated path (1.6-compatible)."}
       </p>
       <ol className="grid gap-4 sm:grid-cols-2">
         {steps.map((step, i) => (

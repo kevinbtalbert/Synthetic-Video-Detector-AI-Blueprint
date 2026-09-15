@@ -56,7 +56,7 @@ WORKDIR ${APP_ROOT}
 ENV ML_RUNTIME_EDITION="SyntheticVideoDetector" \
     ML_RUNTIME_EDITOR="JupyterLab" \
     ML_RUNTIME_KERNEL="Python 3.13" \
-    ML_RUNTIME_SHORT_VERSION="1.10" \
+    ML_RUNTIME_SHORT_VERSION="1.12" \
     ML_RUNTIME_MAINTENANCE_VERSION="0" \
     ML_RUNTIME_DESCRIPTION="Bundled Hugging Face GPU detection and Serverless NVIDIA NVCF (release 1.6 path)"
 

@@ -13,7 +13,7 @@ import requests
 
 from cai.lib.app_config import AppConfig
 from cai.lib.deploy_mode import NIMDeployMode
-from cai.lib.nim_startup import mark_nim_startup_error, reset_nim_startup, update_nim_startup
+from cai.lib.nim_startup import mark_nim_startup_error, reset_nim_startup, tail_log, update_nim_startup
 from cai.lib.paths import CONFIG_DIR
 from cai.lib.open_port import resolve_open_model_port
 from cai.lib.runtime_app import wire_open_runtime_endpoints
@@ -34,10 +34,17 @@ def _gpu_visible() -> bool:
         return False
 
 
-def _wait_for_health(port: int, *, timeout_s: int = 3600) -> None:
+def _wait_for_health(port: int, proc: subprocess.Popen, *, timeout_s: int = 3600) -> None:
     base = f"http://127.0.0.1:{port}"
     deadline = time.time() + timeout_s
     while time.time() < deadline:
+        code = proc.poll()
+        if code is not None:
+            lines = tail_log(MODEL_LOG, lines=8)
+            hint = lines[-1] if lines else "see svd_open_model.log"
+            raise RuntimeError(
+                f"Open model server exited with code {code} before /health was ready ({hint})"
+            )
         try:
             r = requests.get(f"{base}/health", timeout=5)
             if r.status_code == 200:
@@ -48,10 +55,10 @@ def _wait_for_health(port: int, *, timeout_s: int = 3600) -> None:
     raise TimeoutError(f"Open model server did not become healthy on {base}")
 
 
-def _readiness_worker(port: int) -> None:
+def _readiness_worker(port: int, proc: subprocess.Popen) -> None:
     try:
         update_nim_startup("model_loading", "Loading Hugging Face model (first start may take several minutes)")
-        _wait_for_health(port)
+        _wait_for_health(port, proc)
         wire_open_runtime_endpoints(port=port)
         update_nim_startup(
             "endpoints_published",
@@ -115,7 +122,7 @@ def start_open_model_supervisor() -> None:
     )
     thread = threading.Thread(
         target=_readiness_worker,
-        args=(port,),
+        args=(port, proc),
         daemon=True,
         name="svd-open-model-readiness",
     )

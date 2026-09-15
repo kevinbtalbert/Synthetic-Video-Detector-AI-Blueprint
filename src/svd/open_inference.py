@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.svd.model_catalog import ModelKind, resolve_open_model_config
+from src.svd.model_catalog import ModelKind, preset_by_id, resolve_open_model_config
 
 
 @dataclass
@@ -72,10 +72,35 @@ def _logit_from_prob(prob: float) -> float:
     return float(torch.logit(torch.tensor(p)))
 
 
-def _aggregate(clip_results: list[dict[str, float | int]]) -> dict[str, object]:
+def _aggregate_method(kind: ModelKind, preset_id: str | None) -> str:
+    if preset_id:
+        preset = preset_by_id(preset_id)
+        if preset and preset.get("aggregate"):
+            return str(preset["aggregate"]).lower()
+    if kind == "videomae":
+        return "median"
+    return "mean"
+
+
+def _aggregate(
+    clip_results: list[dict[str, float | int]],
+    *,
+    kind: ModelKind = "image",
+    preset_id: str | None = None,
+) -> dict[str, object]:
     if not clip_results:
         raise ValueError("No scores produced")
-    probability = sum(float(c["score"]) for c in clip_results) / len(clip_results)
+    scores = [float(c["score"]) for c in clip_results]
+    method = _aggregate_method(kind, preset_id)
+    if method == "median":
+        sorted_scores = sorted(scores)
+        mid = len(sorted_scores) // 2
+        if len(sorted_scores) % 2:
+            probability = sorted_scores[mid]
+        else:
+            probability = (sorted_scores[mid - 1] + sorted_scores[mid]) / 2.0
+    else:
+        probability = sum(scores) / len(scores)
     mean_logit = sum(float(c["logit"]) for c in clip_results) / len(clip_results)
     if 0.0 < probability < 1.0:
         mean_logit = _logit_from_prob(probability)
@@ -143,7 +168,7 @@ def _score_image_model(loaded: LoadedModel, path: Path) -> dict[str, object]:
         sampled += 1
 
     cap.release()
-    return _aggregate(clip_results)
+    return _aggregate(clip_results, kind="image", preset_id=loaded.preset_id)
 
 
 def _score_videomae(loaded: LoadedModel, path: Path) -> dict[str, object]:
@@ -191,7 +216,7 @@ def _score_videomae(loaded: LoadedModel, path: Path) -> dict[str, object]:
     cap.release()
     if not clip_results:
         raise ValueError("VideoMAE could not sample enough frames")
-    return _aggregate(clip_results)
+    return _aggregate(clip_results, kind="videomae", preset_id=loaded.preset_id)
 
 
 def score_video(path: Path, loaded: LoadedModel) -> dict[str, object]:

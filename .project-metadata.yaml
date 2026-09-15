@@ -4,7 +4,7 @@ description: |
   Hugging Face) or Serverless (NVIDIA NVCF, 1.6-compatible) all-in-one applications.
 author: Cloudera
 specification_version: 1.0
-prototype_version: 1.10
+prototype_version: 1.12
 date: "2026-09-14"
 shared_memory_limit: 8
 
@@ -12,7 +12,7 @@ runtimes:
   - editor: JupyterLab
     kernel: Python 3.13
     edition: SyntheticVideoDetector
-    version: "1.10"
+    version: "1.12"
 
 tasks:
   - type: run_session

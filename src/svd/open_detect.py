@@ -8,7 +8,7 @@ from typing import Callable
 
 import requests
 
-from src.svd.client import ClipResult, DetectionResult, CLASSIFICATION_THRESHOLD, _expit
+from src.svd.client import ClipResult, DetectionResult, _expit, classification_threshold
 
 
 def open_server_base() -> str:
@@ -79,6 +79,6 @@ def detect_video_open(
         total_clips=int(payload.get("total_clips") or len(clip_results)),
         csv_data=str(payload.get("csv_data") or ""),
         clip_results=clip_results,
-        is_synthetic=score >= CLASSIFICATION_THRESHOLD,
+        is_synthetic=score >= classification_threshold(),
         synthetic_score_percent=round(score * 100, 1),
     )

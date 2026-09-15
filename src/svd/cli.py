@@ -18,7 +18,7 @@ if str(ROOT) in sys.path:
     sys.path.remove(str(ROOT))
 sys.path.insert(0, str(ROOT))
 
-from src.svd.client import _expit, detect_video  # noqa: E402
+from src.svd.client import _expit, classification_threshold, detect_video  # noqa: E402
 
 
 def main() -> int:
@@ -50,7 +50,7 @@ def main() -> int:
         "synthetic_score_percent": result.synthetic_score_percent,
         "is_synthetic": result.is_synthetic,
         "total_clips": result.total_clips,
-        "threshold": 0.30,
+        "threshold": classification_threshold(),
         "clip_series": clip_series,
         "csv_data": result.csv_data,
     }

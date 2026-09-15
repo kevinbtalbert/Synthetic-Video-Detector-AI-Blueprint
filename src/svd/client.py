@@ -12,6 +12,17 @@ DATA_CHUNK_SIZE = 2 * 1024 * 1024
 CLASSIFICATION_THRESHOLD = 0.30
 
 
+def classification_threshold() -> float:
+    raw = os.environ.get("SVD_DETECTION_THRESHOLD", "").strip()
+    if not raw:
+        return CLASSIFICATION_THRESHOLD
+    try:
+        value = float(raw)
+    except ValueError:
+        return CLASSIFICATION_THRESHOLD
+    return max(0.0, min(1.0, value))
+
+
 @dataclass
 class ClipResult:
     index: int
