@@ -11,11 +11,20 @@ import DetectionResultsPanel from "@/app/components/atoms/DetectionResultsPanel"
 import { useVideoDetection } from "@/app/hooks/useVideoDetection";
 import { useAppRole } from "@/app/hooks/useAppRole";
 import { resolveDeployMode, useDeploymentStatus } from "@/app/hooks/useDeploymentStatus";
+import { useNimStartup } from "@/app/hooks/useNimStartup";
 
 export default function DetectPage() {
   const { isRuntime } = useAppRole();
   const { pipelineReady, status } = useDeploymentStatus({});
-  const canRunDetection = isRuntime || pipelineReady;
+  const deployMode = resolveDeployMode(status);
+  const bundledRuntime =
+    isRuntime && ["OPEN", "BUNDLED"].includes(String(deployMode).toUpperCase());
+  const { ready: modelReady } = useNimStartup({ enabled: bundledRuntime });
+  const canRunDetection = isRuntime
+    ? bundledRuntime
+      ? modelReady
+      : true
+    : pipelineReady;
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
@@ -43,7 +52,7 @@ export default function DetectPage() {
     disabled: detection.busy,
   });
 
-  const mode = resolveDeployMode(status);
+  const mode = deployMode;
   const analyzing =
     detection.busy ||
     detection.phase === "analyzing" ||
@@ -116,7 +125,9 @@ export default function DetectPage() {
             </button>
             {!canRunDetection && file && (
               <p className="mt-3 text-sm text-amber-400/90">
-                Waiting for the deployed runtime application (model server + UI) to become ready…
+                {bundledRuntime
+                  ? "Wait for the Hugging Face model server to finish loading (see status above), then run detection."
+                  : "Waiting for the deployed runtime application (model server + UI) to become ready…"}
               </p>
             )}
             {detection.error && <p className="mt-3 text-sm text-red-400">{detection.error}</p>}

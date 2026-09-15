@@ -2,7 +2,7 @@
 # Optional NVCF gRPC layer on top of the open runtime image.
 # Build open image first, then: ./scripts/docker/build-svd-image.sh --serverless
 
-ARG BASE_TAG=synthetic-video-detector:1.9
+ARG BASE_TAG=synthetic-video-detector:1.10
 FROM ${BASE_TAG}
 
 USER root

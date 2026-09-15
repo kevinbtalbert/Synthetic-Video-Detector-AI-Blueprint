@@ -15,7 +15,7 @@ def open_server_base() -> str:
     explicit = os.environ.get("SVD_OPEN_SERVER", "").strip().rstrip("/")
     if explicit:
         return explicit
-    port = os.environ.get("SVD_OPEN_PORT", "8080")
+    port = os.environ.get("SVD_OPEN_PORT", "8090")
     return f"http://127.0.0.1:{port}"
 
 

@@ -7,7 +7,7 @@ Cloudera AI Workbench blueprint with **two deploy modes** from Launchpad:
 | **Bundled (GPU)** | **New:** Hugging Face model server + Detect UI in one application (three curated presets). Replaces the old NIM-in-pod bundle. |
 | **Serverless (CPU)** | **Same as 1.6:** NVIDIA Synthetic Video Detector via NVCF gRPC (`grpc.nvcf.nvidia.com`), NGC API key, function ID. |
 
-Both use runtime edition **SyntheticVideoDetector** v1.9 (single Docker image: open + serverless Python extras).
+Both use runtime edition **SyntheticVideoDetector** v1.10 (single Docker image: open + serverless Python extras).
 
 ## Build
 

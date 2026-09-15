@@ -5,7 +5,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${root}"
 
-VERSION="${SVD_RUNTIME_VERSION:-1.9}"
+VERSION="${SVD_RUNTIME_VERSION:-1.10}"
 REPO="${SVD_RUNTIME_REPO:-synthetic-video-detector}"
 REGISTRY="${SVD_RUNTIME_REGISTRY:-}"
 

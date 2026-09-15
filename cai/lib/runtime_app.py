@@ -10,6 +10,7 @@ from shutil import which
 
 from cai.lib.cai_common import apply_dotenv_to_os
 from cai.lib.demo_ui import DEMO_DIR, SERVER_JS, demo_ui_ready, missing_demo_ui_message
+from cai.lib.open_port import DEFAULT_OPEN_MODEL_PORT, resolve_open_model_port
 from cai.lib.paths import ENDPOINTS_ENV, ensure_cai_dirs
 
 
@@ -27,8 +28,8 @@ def start_runtime_ui() -> int:
         apply_dotenv_to_os(ENDPOINTS_ENV)
     os.environ["NIM_DEPLOY_MODE"] = baked_mode
     if baked_mode.upper() in {"BUNDLED", "OPEN", "OPEN_WEIGHTS"}:
-        port = os.environ.get("SVD_OPEN_PORT", "8080")
-        os.environ.setdefault("SVD_OPEN_SERVER", f"http://127.0.0.1:{port}")
+        open_port = resolve_open_model_port()
+        os.environ.setdefault("SVD_OPEN_SERVER", f"http://127.0.0.1:{open_port}")
 
     port = os.environ.get("CDSW_APP_PORT") or os.environ.get("PORT") or "8080"
     os.environ["PORT"] = str(port)
@@ -52,7 +53,7 @@ def start_runtime_ui() -> int:
     return subprocess.call([node, str(SERVER_JS)])
 
 
-def wire_open_runtime_endpoints(*, port: int = 8080) -> None:
+def wire_open_runtime_endpoints(*, port: int = DEFAULT_OPEN_MODEL_PORT) -> None:
     """Write local runtime endpoints for open-weights model server in this pod."""
     from cai.lib.cai_common import write_dotenv_file
     from cai.lib.deploy_mode import NIMDeployMode
@@ -69,7 +70,7 @@ def wire_open_runtime_endpoints(*, port: int = 8080) -> None:
 
 
 def wire_bundled_runtime_endpoints(*, grpc_port: int = 8001) -> None:
-    wire_open_runtime_endpoints(port=int(os.environ.get("SVD_OPEN_PORT", "8080")))
+    wire_open_runtime_endpoints(port=resolve_open_model_port())
 
 
 def wire_serverless_runtime_endpoints(config) -> None:

@@ -15,6 +15,7 @@ from cai.lib.app_config import AppConfig
 from cai.lib.deploy_mode import NIMDeployMode
 from cai.lib.nim_startup import mark_nim_startup_error, reset_nim_startup, update_nim_startup
 from cai.lib.paths import CONFIG_DIR
+from cai.lib.open_port import resolve_open_model_port
 from cai.lib.runtime_app import wire_open_runtime_endpoints
 
 PROJECT_ROOT = Path(os.environ.get("CDSW_PROJECT_DIR", "/home/cdsw"))
@@ -31,10 +32,6 @@ def _gpu_visible() -> bool:
         return True
     except (subprocess.CalledProcessError, OSError, subprocess.TimeoutExpired):
         return False
-
-
-def _open_port() -> int:
-    return int(os.environ.get("SVD_OPEN_PORT", "8080"))
 
 
 def _wait_for_health(port: int, *, timeout_s: int = 3600) -> None:
@@ -97,7 +94,12 @@ def start_open_model_supervisor() -> None:
 
     config = AppConfig.from_environ(mode=NIMDeployMode.BUNDLED)
     config.apply_to_environ()
-    port = _open_port()
+    port = resolve_open_model_port()
+    update_nim_startup(
+        "config_applied",
+        "Configuration applied",
+        checks={"config_applied": True},
+    )
     wire_open_runtime_endpoints(port=port)
     update_nim_startup(
         "endpoints_wired",

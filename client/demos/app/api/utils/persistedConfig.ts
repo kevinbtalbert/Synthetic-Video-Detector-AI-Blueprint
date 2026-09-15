@@ -133,7 +133,7 @@ export function buildDetectProcessEnv(): NodeJS.ProcessEnv {
     const mode = normalizeMode(String(env.NIM_DEPLOY_MODE || "OPEN"));
     if (mode === "OPEN") {
       env.NIM_DEPLOY_MODE = "OPEN";
-      const port = String(env.SVD_OPEN_PORT || "8080");
+      const port = String(env.SVD_OPEN_PORT || "8090");
       env.SVD_OPEN_SERVER = String(env.SVD_OPEN_SERVER || `http://127.0.0.1:${port}`);
     }
   }
@@ -149,6 +149,17 @@ export function buildDetectProcessEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
+function bundledModelStartupReady(): boolean {
+  const startupPath = path.join(projectRoot(), "cai/config/nim_startup.json");
+  if (!fs.existsSync(startupPath)) return false;
+  try {
+    const data = JSON.parse(fs.readFileSync(startupPath, "utf8")) as { ready?: boolean };
+    return Boolean(data.ready);
+  } catch {
+    return false;
+  }
+}
+
 export function validateDetectEnv(env: NodeJS.ProcessEnv): string | null {
   const mode = normalizeMode(String(env.NIM_DEPLOY_MODE || "OPEN"));
   const role = String(env.SVD_APP_ROLE || "runtime");
@@ -161,6 +172,9 @@ export function validateDetectEnv(env: NodeJS.ProcessEnv): string | null {
   const openServer = String(env.SVD_OPEN_SERVER || "");
   if (!openServer && role === "runtime") {
     return "Open model server is not configured. Wait for the app to finish loading the Hugging Face model.";
+  }
+  if (role === "runtime" && !bundledModelStartupReady()) {
+    return "Model server is still loading. Wait until startup shows healthy, then run detection again.";
   }
   if (role === "launchpad") {
     return "Open the deployed Open Weights app URL from the Launchpad to run detection.";

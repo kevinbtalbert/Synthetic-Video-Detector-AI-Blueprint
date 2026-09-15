@@ -33,10 +33,15 @@ export async function GET(): Promise<NextResponse> {
   const endpointsPath = path.join(projectRoot(), "cai/nim_endpoints.json");
   const endpointsPublished = fs.existsSync(endpointsPath);
 
+  const bundledMode = mode === "BUNDLED" || mode === "OPEN" || mode === "OPEN_WEIGHTS";
+  const ready = bundledMode
+    ? Boolean(startup?.ready)
+    : Boolean(startup?.ready || endpointsPublished);
+
   return NextResponse.json({
     mode,
     role,
-    ready: Boolean(startup?.ready || endpointsPublished),
+    ready,
     startup,
     endpoints_published: endpointsPublished,
   });

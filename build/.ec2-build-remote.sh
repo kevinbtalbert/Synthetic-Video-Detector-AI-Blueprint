@@ -13,7 +13,7 @@ rsync -avz --exclude .git --exclude node_modules --exclude .venv \
 ssh "${host}" bash -lc "
   set -euo pipefail
   cd ~/${repo}
-  export SVD_RUNTIME_VERSION=\${SVD_RUNTIME_VERSION:-1.9}
+  export SVD_RUNTIME_VERSION=\${SVD_RUNTIME_VERSION:-1.10}
   export SVD_RUNTIME_REGISTRY=\${SVD_RUNTIME_REGISTRY:-kevintalbert}
   ./scripts/docker/build-svd-image.sh
 "

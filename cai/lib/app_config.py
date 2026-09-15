@@ -40,7 +40,7 @@ class AppConfig:
     svd_hf_model_id: str = "eftt/VideoMae-ffc23-deepfake-detector"
     svd_open_model_preset: str = "videomae-ffc23"
     svd_open_model_kind: str = "videomae"
-    svd_open_port: str = "8080"
+    svd_open_port: str = "8090"
     svd_nvidia_function_id: str = DEFAULT_SVD_NVCF_FUNCTION_ID
     nvidia_serverless_grpc_host: str = "grpc.nvcf.nvidia.com"
     nvidia_serverless_grpc_port: str = "443"
@@ -61,7 +61,7 @@ class AppConfig:
             ),
             svd_open_model_preset=str(os.environ.get("SVD_OPEN_MODEL_PRESET", "videomae-ffc23")),
             svd_open_model_kind=str(os.environ.get("SVD_OPEN_MODEL_KIND", "videomae")),
-            svd_open_port=str(os.environ.get("SVD_OPEN_PORT", "8080")),
+            svd_open_port=str(os.environ.get("SVD_OPEN_PORT", "8090")),
             svd_nvidia_function_id=str(
                 os.environ.get("SVD_NVIDIA_FUNCTION_ID") or DEFAULT_SVD_NVCF_FUNCTION_ID
             ),
@@ -84,7 +84,7 @@ class AppConfig:
             ),
             svd_open_model_preset=str(data.get("svd_open_model_preset", "videomae-ffc23")),
             svd_open_model_kind=str(data.get("svd_open_model_kind", "videomae")),
-            svd_open_port=str(data.get("svd_open_port", "8080")),
+            svd_open_port=str(data.get("svd_open_port", "8090")),
             svd_nvidia_function_id=str(
                 data.get("svd_nvidia_function_id") or DEFAULT_SVD_NVCF_FUNCTION_ID
             ),

@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from src.svd.model_catalog import resolve_open_model_config
 from src.svd.open_inference import LoadedModel, load_open_model, score_video
 
-DEFAULT_PORT = 8080
+DEFAULT_PORT = 8090
 
 _loaded: LoadedModel | None = None
 

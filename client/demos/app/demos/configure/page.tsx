@@ -50,7 +50,7 @@ const defaultBundled: BundledForm = {
   svd_open_model_preset: "videomae-ffc23",
   svd_open_model_kind: "videomae",
   svd_hf_model_id: "eftt/VideoMae-ffc23-deepfake-detector",
-  svd_open_port: "8080",
+  svd_open_port: "8090",
   detection_threshold: "0.30",
 };
 

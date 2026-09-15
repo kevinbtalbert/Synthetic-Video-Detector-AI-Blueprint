@@ -6,7 +6,7 @@ entries:
       Deploy Bundled GPU applications with curated Hugging Face models, or Serverless
       NVIDIA NVCF inference (1.6 path)—each with the Detect UI via Launchpad.
     long_description: |
-      Register runtime **SyntheticVideoDetector** v1.9 (repository Dockerfile).
+      Register runtime **SyntheticVideoDetector** v1.10 (repository Dockerfile).
       **Bundled** — new path: HF model server + UI in one GPU pod (pick from three presets).
       **Serverless** — same NVCF gRPC flow as release 1.6 (NGC key, function ID, CPU app).
     image_path: "https://raw.githubusercontent.com/kevinbtalbert/Synthetic-Video-Detector-AI-Blueprint/refs/heads/main/assets/synthetic-video-detector.jpg"
