@@ -13,10 +13,7 @@ rsync -avz --exclude .git --exclude node_modules --exclude .venv \
 ssh "${host}" bash -lc "
   set -euo pipefail
   cd ~/${repo}
-  if [[ -z \"\${NGC_API_KEY:-}\" ]]; then
-    echo 'Set NGC_API_KEY on EC2 before building'
-    exit 1
-  fi
-  echo \"\$NGC_API_KEY\" | docker login nvcr.io -u '\$oauthtoken' --password-stdin
+  export SVD_RUNTIME_VERSION=\${SVD_RUNTIME_VERSION:-1.9}
+  export SVD_RUNTIME_REGISTRY=\${SVD_RUNTIME_REGISTRY:-kevintalbert}
   ./scripts/docker/build-svd-image.sh
 "

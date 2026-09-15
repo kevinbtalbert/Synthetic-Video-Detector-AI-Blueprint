@@ -42,7 +42,7 @@ export type DeploymentStatus = {
   secrets_set?: {
     serverless?: { ngc_api_key?: boolean };
     open?: { hf_token?: boolean };
-    bundled?: { ngc_api_key?: boolean };
+    bundled?: { hf_token?: boolean };
   };
   mode_summary?: { headline?: string; detail?: string };
   deployments?: Record<string, ServiceStatus>;

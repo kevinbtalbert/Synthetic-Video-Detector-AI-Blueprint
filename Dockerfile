@@ -43,13 +43,12 @@ COPY cai ./cai
 COPY assets ./assets
 
 RUN uv sync --extra open --extra serverless \
-    && bash protos/generate_protos.sh \
+    && uv run bash protos/generate_protos.sh \
     && mkdir -p /var/lib/synthetic-video-detector/huggingface \
     && chown -R cdsw:cdsw ${APP_ROOT} /var/lib/synthetic-video-detector
 
 COPY --from=ui-builder --chown=cdsw:cdsw /build/client/demos/dist ./client/demos/dist
 COPY --from=ui-builder --chown=cdsw:cdsw /build/client/demos/.next ./client/demos/.next
-COPY --from=ui-builder --chown=cdsw:cdsw /build/client/demos/public ./client/demos/public
 
 USER cdsw
 WORKDIR ${APP_ROOT}
