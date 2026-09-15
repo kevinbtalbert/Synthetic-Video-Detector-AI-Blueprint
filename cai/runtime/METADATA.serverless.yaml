@@ -1,3 +1,0 @@
-edition: SyntheticVideoDetector-Serverless
-description: SyntheticMediaDetector runtime plus optional NVIDIA Cloud Functions gRPC client
-short_version: "1.10"

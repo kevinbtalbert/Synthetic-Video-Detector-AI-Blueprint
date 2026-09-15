@@ -72,7 +72,7 @@ def detect_video(
         except ImportError as exc:
             raise RuntimeError(
                 "Serverless detection requires the serverless Python extra (grpcio). "
-                "Use the SyntheticVideoDetector-Serverless runtime image or uv sync --extra serverless."
+                "Use the SyntheticVideoDetector runtime image or uv sync --extra serverless."
             ) from exc
         return detect_video_serverless(path, timeout_s=timeout_s, on_progress=on_progress)
 
