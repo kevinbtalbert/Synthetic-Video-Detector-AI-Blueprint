@@ -23,7 +23,7 @@ The Synthetic Video Detector blueprint helps teams assess **clip-level synthetic
 ## Demo
 
 - **Catalog asset:** [assets/synthetic-video-detector.jpg](assets/synthetic-video-detector.jpg)
-- **Sample media:** [assets/real_sample_video.mp4](assets/real_sample_video.mp4), [assets/fake_sample_video.mp4](assets/fake_sample_video.mp4) — FaceForensics++ demo pair (~5 s); see [assets/SAMPLE_VIDEOS_ATTRIBUTION.md](assets/SAMPLE_VIDEOS_ATTRIBUTION.md)
+- **Sample media:** [assets/real_sample_video.mp4](assets/real_sample_video.mp4), [assets/fake_sample_video.mp4](assets/fake_sample_video.mp4) — two independent SDFVD / Pexels clips (~5 s); see [assets/SAMPLE_VIDEOS_ATTRIBUTION.md](assets/SAMPLE_VIDEOS_ATTRIBUTION.md)
 - **Reprise / walkthrough:** _Add your Reprise or recorded demo link here when published._
 
 After deployment, open the **Bundled** or **Serverless** runtime URL → **Detect** → upload MP4 → view timeline scores and aggregate verdict.

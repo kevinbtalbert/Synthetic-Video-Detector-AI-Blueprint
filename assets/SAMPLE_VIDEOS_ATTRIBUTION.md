@@ -1,36 +1,40 @@
 # Demo sample videos — attribution
 
-The side-by-side clips in the Launchpad **Demo** tab are short MP4s from the public research dataset **FaceForensics++**, bundled in this repo for offline smoke tests only.
+The Launchpad **Demo** tab serves two **independent** ~5 second MP4 clips (different subjects/scenes—not a before/after pair of the same take).
 
-| File | Label | Source in FaceForensics++ | Duration |
-|------|--------|---------------------------|----------|
-| `real_sample_video.mp4` | Authentic | Original YouTube sequence **000** (H.264 **c23** compression) | ~4.9 s |
-| `fake_sample_video.mp4` | Synthetic (manipulated) | **Deepfakes** manipulation **000_003** (swap using donor sequence **003** on base **000**, c23) | ~4.9 s |
+| File | Label | Source clip | Duration |
+|------|--------|-------------|----------|
+| `real_sample_video.mp4` | Authentic | [SDFVD](https://huggingface.co/datasets/Hemgg/SDFVD-video-dataset) `Real/v38.mp4` (720p stock; original footage from **Pexels**) | 5.0 s |
+| `fake_sample_video.mp4` | Synthetic (face-swap) | [SDFVD](https://huggingface.co/datasets/Hemgg/SDFVD-video-dataset) `Fake/vs22.mp4` (Remaker AI face-swap on a **different** real clip, `v22`); first 5.0 s retained for the demo bundle | 5.0 s |
+
+## Licenses (permissive use)
+
+- **Real footage:** The SDFVD authors sourced originals from [Pexels](https://www.pexels.com/). Pexels content is free to use under the [Pexels License](https://www.pexels.com/license/) (including commercial use; attribution appreciated but not required).
+- **Synthetic clip:** Distributed as part of the public **SDFVD** research dataset on Hugging Face. The same clips are also aggregated in [belkhir-nacim/deepfake-videos](https://huggingface.co/datasets/belkhir-nacim/deepfake-videos) under **CC BY 4.0** (with permission from contributing dataset authors). This blueprint redistributes only these two files for demo purposes.
 
 ## Citation
 
-If you use these samples in a paper or report, cite FaceForensics++:
+If you reference the sample clips in documentation or research:
+
+```text
+Hemgg. SDFVD video dataset. Hugging Face, 2025.
+https://huggingface.co/datasets/Hemgg/SDFVD-video-dataset
+```
+
+Optional (unified mirror):
 
 ```bibtex
-@inproceedings{rossler2019faceforensics++,
-  title={FaceForensics++: Learning to Detect Manipulated Facial Images},
-  author={R{\"o}ssler, Andreas and Coelho, Davi and K{\"o}pfer, Nicolas and Cozzolino, Dario and Nie{\ss}ner, Matthias},
-  booktitle={Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
-  year={2019}
+@misc{unified-deepfake-2024,
+  title={Unified Deepfake Video Dataset},
+  author={belkhir-nacim},
+  year={2024},
+  publisher={Hugging Face},
+  url={https://huggingface.co/datasets/belkhir-nacim/deepfake-videos}
 }
 ```
 
-## Where the files came from
-
-- **Dataset home:** [ondyari/FaceForensics](https://github.com/ondyari/FaceForensics) (FaceForensics++ download requires accepting the authors’ [dataset terms](https://github.com/ondyari/FaceForensics/tree/master/dataset)).
-- **Copies in this repo:** Retrieved from the Hugging Face mirror [TonyStark03/deepfake](https://huggingface.co/datasets/TonyStark03/deepfake) (`000.mp4` and `000_003.mp4`, renamed for the blueprint). That mirror is a convenience for small research clips; the canonical distribution remains the FaceForensics++ release.
-
-## License and use
-
-FaceForensics++ is intended for **non-commercial research and education**. Do not use these clips to imply endorsement by the dataset authors, YouTube, or Cloudera. For production or commercial demos, replace the files under `assets/` with media you own or that is licensed for your use, and update this document.
-
 ## Replacing the samples
 
-1. Overwrite `real_sample_video.mp4` and/or `fake_sample_video.mp4` in this directory.
-2. Update this file with source, license, and citation.
+1. Overwrite `real_sample_video.mp4` and/or `fake_sample_video.mp4`.
+2. Update this file with source URLs, license, and citation.
 3. Rebuild or redeploy the UI if your runtime image embeds `assets/` at build time.
