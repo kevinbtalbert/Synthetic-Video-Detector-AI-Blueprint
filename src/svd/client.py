@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable
 
 DATA_CHUNK_SIZE = 2 * 1024 * 1024
-CLASSIFICATION_THRESHOLD = 0.30
+CLASSIFICATION_THRESHOLD = 0.05
 
 
 def classification_threshold() -> float:

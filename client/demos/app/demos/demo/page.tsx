@@ -15,14 +15,16 @@ const SAMPLE_VIDEOS: SampleVideo[] = [
   {
     id: "real",
     label: "Real video",
-    description: "Authentic footage — expected to classify as real.",
+    description:
+      "FaceForensics++ original sequence 000 (~5 s) — expected to classify as real.",
     src: "/api/samples/real",
     filename: "real_sample_video.mp4",
   },
   {
     id: "fake",
     label: "Synthetic video",
-    description: "AI-generated example — expected to classify as synthetic.",
+    description:
+      "FaceForensics++ Deepfakes clip 000_003 (~5 s) — expected to classify as synthetic.",
     src: "/api/samples/fake",
     filename: "fake_sample_video.mp4",
   },
@@ -59,7 +61,22 @@ export default function DemoPage() {
             ))}
           </div>
 
-          <p className="mt-6 text-sm text-neutral-500">
+          <p className="mt-4 text-xs text-neutral-500">
+            Sample videos are from{" "}
+            <a
+              href="https://github.com/ondyari/FaceForensics"
+              className="text-[var(--nvidia-green)] underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              FaceForensics++
+            </a>{" "}
+            (research use; see{" "}
+            <code className="text-neutral-400">assets/SAMPLE_VIDEOS_ATTRIBUTION.md</code> in the
+            project repo).
+          </p>
+
+          <p className="mt-4 text-sm text-neutral-500">
             To analyze your own file, use the{" "}
             <Link href="/demos/detect" className="text-[var(--nvidia-green)] underline">
               Detect

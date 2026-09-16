@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import type { OpenModelCatalog, OpenModelPreset } from "@/app/lib/openModels";
+import ModelPresetInfoModal from "@/app/components/atoms/ModelPresetInfoModal";
 
 type Props = {
   catalog: OpenModelCatalog;
@@ -10,8 +12,12 @@ type Props = {
 };
 
 export default function ModelPresetPicker({ catalog, selectedId, onSelect, disabled }: Props) {
+  const [infoPreset, setInfoPreset] = useState<OpenModelPreset | null>(null);
+
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <>
+      <ModelPresetInfoModal preset={infoPreset} onClose={() => setInfoPreset(null)} />
+      <div className="grid gap-4 lg:grid-cols-3">
       {catalog.presets.map((preset) => {
         const active = preset.id === selectedId;
         return (
@@ -58,10 +64,24 @@ export default function ModelPresetPicker({ catalog, selectedId, onSelect, disab
                 {preset.metrics_hint}
               </p>
             ) : null}
-            <p className="mt-2 truncate font-mono text-[10px] text-neutral-500">{preset.hf_model_id}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-3">
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setInfoPreset(preset);
+                }}
+                className="rounded-md border border-[var(--border)] bg-black/30 px-2.5 py-1 text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--surface-elevated)] disabled:opacity-50"
+              >
+                More info
+              </button>
+              <span className="truncate font-mono text-[10px] text-neutral-500">{preset.hf_model_id}</span>
+            </div>
           </button>
         );
       })}
-    </div>
+      </div>
+    </>
   );
 }

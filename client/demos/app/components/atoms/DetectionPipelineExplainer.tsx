@@ -3,7 +3,7 @@
 const SERVERLESS_STEPS = [
   {
     title: "Upload & validate",
-    body: "Your H.264 MP4 is streamed to the NVIDIA Synthetic Video Detector on Cloud Functions—the same NVCF gRPC path as release 1.6.",
+    body: "Your H.264 MP4 is streamed to NVIDIA Synthetic Video Detector on Cloud Functions over gRPC.",
   },
   {
     title: "Temporal clip analysis",
@@ -60,8 +60,8 @@ export default function DetectionPipelineExplainer({ deployMode }: { deployMode:
       </div>
       <p className="mb-6 max-w-3xl text-sm leading-relaxed text-[var(--text-secondary)]">
         {bundled
-          ? "Bundled runtimes run Hugging Face presets in your GPU pod (research / offline). Scores are not calibrated to the NVIDIA Synthetic Video Detector NIM—use Serverless when you need the same behavior as release 1.6."
-          : "Serverless runtimes use your NGC credentials to call NVIDIA-hosted Synthetic Video Detector inference—the production-calibrated path (1.6-compatible)."}
+          ? "Bundled runtimes run Hugging Face presets entirely in your GPU application. Scores reflect the selected open-weights model—not NVIDIA-hosted Synthetic Video Detector inference."
+          : "Serverless runtimes use your NGC credentials to call NVIDIA-hosted Synthetic Video Detector inference on Cloud Functions."}
       </p>
       <ol className="grid gap-4 sm:grid-cols-2">
         {steps.map((step, i) => (

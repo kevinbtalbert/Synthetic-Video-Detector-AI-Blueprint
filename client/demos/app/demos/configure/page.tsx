@@ -42,7 +42,7 @@ const defaultServerless: ServerlessForm = {
   svd_nvidia_function_id: "847b6e53-0133-452d-ab85-d7acf3ace723",
   nvidia_serverless_grpc_host: "grpc.nvcf.nvidia.com",
   nvidia_serverless_grpc_port: "443",
-  detection_threshold: "0.30",
+  detection_threshold: "0.05",
 };
 
 const defaultBundled: BundledForm = {
@@ -51,7 +51,7 @@ const defaultBundled: BundledForm = {
   svd_open_model_kind: "videomae",
   svd_hf_model_id: "eftt/VideoMae-ffc23-deepfake-detector",
   svd_open_port: "8090",
-  detection_threshold: "0.30",
+  detection_threshold: "0.05",
 };
 
 function appUrl(subdomain?: string): string | null {
@@ -115,6 +115,7 @@ function DeploySection({
           className={inputClass}
           value={form.detection_threshold}
           onChange={(e) => onChange({ detection_threshold: e.target.value })}
+          placeholder="0.05"
         />
       </label>
       <div className="mt-6 flex flex-wrap gap-3">
@@ -273,9 +274,10 @@ export default function LaunchpadPage() {
               Deploy production-ready detection runtimes
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-              Two first-class runtimes: <strong className="text-[var(--text-primary)]">Bundled</strong> (new—HF
-              model + UI in one GPU app) and <strong className="text-[var(--text-primary)]">Serverless</strong>{" "}
-              (NVIDIA NVCF gRPC, same as release 1.6).
+              Choose a deployment mode: <strong className="text-[var(--text-primary)]">Bundled</strong> runs a
+              Hugging Face model and Detect UI in one GPU application;{" "}
+              <strong className="text-[var(--text-primary)]">Serverless</strong> calls NVIDIA Synthetic Video
+              Detector on Cloud Functions over gRPC from a CPU application.
             </p>
           </div>
           <div
@@ -299,7 +301,7 @@ export default function LaunchpadPage() {
         <DeploySection
           mode="SERVERLESS"
           title="Deploy Serverless (NVCF)"
-          description="CPU application—streams video to the NVIDIA Synthetic Video Detector on Cloud Functions (gRPC). Same configuration model as release 1.6."
+          description="CPU application that streams MP4 input to NVIDIA Synthetic Video Detector on Cloud Functions (gRPC). Requires an NGC API key and NVCF function ID."
           form={serverlessForm}
           onChange={(patch) => {
             setDirty((d) => ({ ...d, serverless: true }));
@@ -352,7 +354,7 @@ export default function LaunchpadPage() {
         <DeploySection
           mode="BUNDLED"
           title="Deploy Bundled (GPU)"
-          description="Single GPU application: curated Hugging Face model server + Detect/Demo UI in one pod (replaces legacy NIM bundle)."
+          description="Single GPU application with a curated Hugging Face model server and Detect/Demo UI in one pod."
           form={bundledForm}
           showNgcKey={false}
           onChange={(patch) => {

@@ -44,7 +44,7 @@ class AppConfig:
     svd_nvidia_function_id: str = DEFAULT_SVD_NVCF_FUNCTION_ID
     nvidia_serverless_grpc_host: str = "grpc.nvcf.nvidia.com"
     nvidia_serverless_grpc_port: str = "443"
-    detection_threshold: str = "0.30"
+    detection_threshold: str = "0.05"
 
     @classmethod
     def from_environ(cls, *, mode: str | NIMDeployMode | None = None) -> AppConfig:
@@ -69,7 +69,7 @@ class AppConfig:
                 os.environ.get("NVIDIA_SERVERLESS_GRPC_HOST", "grpc.nvcf.nvidia.com")
             ),
             nvidia_serverless_grpc_port=str(os.environ.get("NVIDIA_SERVERLESS_GRPC_PORT", "443")),
-            detection_threshold=str(os.environ.get("SVD_DETECTION_THRESHOLD", "0.30")),
+            detection_threshold=str(os.environ.get("SVD_DETECTION_THRESHOLD", "0.05")),
         )
 
     @classmethod
@@ -92,7 +92,7 @@ class AppConfig:
                 data.get("nvidia_serverless_grpc_host", "grpc.nvcf.nvidia.com")
             ),
             nvidia_serverless_grpc_port=str(data.get("nvidia_serverless_grpc_port", "443")),
-            detection_threshold=str(data.get("detection_threshold", "0.30")),
+            detection_threshold=str(data.get("detection_threshold", "0.05")),
         )
 
     def to_dict(self) -> dict[str, Any]:

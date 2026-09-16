@@ -1,3 +1,10 @@
+export type OpenModelPresetMoreInfo = {
+  what_it_offers?: string;
+  best_for?: string;
+  limitations?: string;
+  highlights?: string[];
+};
+
 export type OpenModelPreset = {
   id: string;
   name: string;
@@ -10,6 +17,7 @@ export type OpenModelPreset = {
   summary: string;
   metrics_hint?: string;
   hf_url: string;
+  more_info?: OpenModelPresetMoreInfo;
 };
 
 export type OpenModelCatalog = {

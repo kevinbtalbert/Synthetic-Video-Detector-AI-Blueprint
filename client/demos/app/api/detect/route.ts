@@ -124,7 +124,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             emit({
               type: "done",
               ...result,
-              threshold: result.threshold ?? 0.3,
+              threshold: result.threshold ?? 0.05,
               clip_series: result.clip_series ?? [],
             });
           } catch (err) {

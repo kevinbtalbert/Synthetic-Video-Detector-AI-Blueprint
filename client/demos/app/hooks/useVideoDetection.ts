@@ -37,7 +37,7 @@ function buildResult(event: StreamEvent): DetectionResult {
     synthetic_score_percent: Number(event.synthetic_score_percent ?? 0),
     is_synthetic: Boolean(event.is_synthetic),
     total_clips: Number(event.total_clips ?? clipSeries.length),
-    threshold: Number(event.threshold ?? 0.3),
+    threshold: Number(event.threshold ?? 0.05),
     clip_series: clipSeries,
     csv_data: event.csv_data,
   };

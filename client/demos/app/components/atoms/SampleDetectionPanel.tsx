@@ -81,7 +81,7 @@ export default function SampleDetectionPanel({ sample, pipelineReady }: Props) {
           <DetectionResultsPanel
             result={detection.result}
             clipSeriesLive={detection.clipSeriesLive}
-            threshold={0.3}
+            threshold={0.05}
             analyzing={analyzing}
             embedVideo
             compact
