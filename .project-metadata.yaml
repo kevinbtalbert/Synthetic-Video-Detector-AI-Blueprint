@@ -1,7 +1,7 @@
 name: Synthetic Video Detector
 description: |
   Synthetic video detection on Cloudera AI Workbench. Launchpad deploys Bundled (GPU,
-  Hugging Face) or Serverless (NVIDIA NVCF, 1.6-compatible) all-in-one applications.
+  Hugging Face) or Serverless (NVIDIA NVCF) all-in-one applications.
 author: Cloudera
 specification_version: 1.0
 prototype_version: 1.12

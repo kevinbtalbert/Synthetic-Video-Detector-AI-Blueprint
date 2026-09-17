@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Synthetic Video Detector runtime: Bundled (HF GPU) + Serverless (NVCF gRPC) — same edition as 1.6 serverless path.
+# Synthetic Video Detector runtime: Bundled (HF GPU) + Serverless (NVCF gRPC).
 #
 # Build: ./scripts/docker/build-svd-image.sh
 
@@ -58,7 +58,7 @@ ENV ML_RUNTIME_EDITION="SyntheticVideoDetector" \
     ML_RUNTIME_KERNEL="Python 3.13" \
     ML_RUNTIME_SHORT_VERSION="1.12" \
     ML_RUNTIME_MAINTENANCE_VERSION="0" \
-    ML_RUNTIME_DESCRIPTION="Bundled Hugging Face GPU detection and Serverless NVIDIA NVCF (release 1.6 path)"
+    ML_RUNTIME_DESCRIPTION="Bundled Hugging Face GPU detection and Serverless NVIDIA NVCF"
 
 ENV ML_RUNTIME_FULL_VERSION="${ML_RUNTIME_SHORT_VERSION}.${ML_RUNTIME_MAINTENANCE_VERSION}"
 

@@ -9,9 +9,19 @@ VERSION="${SVD_RUNTIME_VERSION:-1.12}"
 REPO="${SVD_RUNTIME_REPO:-synthetic-video-detector}"
 REGISTRY="${SVD_RUNTIME_REGISTRY:-}"
 
-tags=("${REPO}:${VERSION}" "${REPO}:${VERSION}-turing")
+tags=(
+  "${REPO}:${VERSION}"
+  "${REPO}:${VERSION}-turing"
+  "${REPO}:latest"
+  "${REPO}:latest-turing"
+)
 if [[ -n "${REGISTRY}" ]]; then
-  tags+=("${REGISTRY}/${REPO}:${VERSION}" "${REGISTRY}/${REPO}:${VERSION}-turing")
+  tags+=(
+    "${REGISTRY}/${REPO}:${VERSION}"
+    "${REGISTRY}/${REPO}:${VERSION}-turing"
+    "${REGISTRY}/${REPO}:latest"
+    "${REGISTRY}/${REPO}:latest-turing"
+  )
 fi
 
 build_args=(docker build --platform linux/amd64 -f Dockerfile)

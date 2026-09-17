@@ -1,6 +1,6 @@
 # Cloudera Blueprint: Synthetic Video Detector
 
-> Detect deepfakes and synthetic video in media workflows on **Cloudera AI**. Launchpad deploys **Bundled** GPU applications (curated Hugging Face models in-pod) or **Serverless** CPU applications (optional NVIDIA Cloud Functions gRPC, 1.6-compatible)—each with the same Detect and Demo UI.
+> Detect deepfakes and synthetic video in media workflows on **Cloudera AI**. Launchpad deploys **Bundled** GPU applications (curated Hugging Face models in-pod) or **Serverless** CPU applications (optional NVIDIA Cloud Functions gRPC)—each with the same Detect and Demo UI.
 
 ## Table of Contents
 
@@ -43,10 +43,22 @@ After deployment, open the **Bundled** or **Serverless** runtime URL → **Detec
 - **Custom ML runtime** (`Dockerfile` → register `cai/runtime/METADATA.yaml` in the Runtime Catalog).
 - **Bundled path** does not embed NVIDIA detector weights; **Serverless** uses customer NGC credentials to call hosted inference.
 
+## Runtime image (Docker Hub)
+
+Prebuilt **SyntheticVideoDetector** edition **1.12** (linux/amd64):
+
+| Tag | Use |
+| --- | --- |
+| [`kevintalbert/synthetic-video-detector:latest`](https://hub.docker.com/r/kevintalbert/synthetic-video-detector) | Current release (points at **1.12**) |
+| `kevintalbert/synthetic-video-detector:latest-turing` | Same image; Turing GPU catalog label |
+| `kevintalbert/synthetic-video-detector:1.12` / `:1.12-turing` | Pinned version |
+
+Register the image in your Cloudera AI **Runtime Catalog** with edition **SyntheticVideoDetector** and short version **1.12** (`cai/runtime/METADATA.yaml`).
+
 ## Quickstart
 
 1. **Clone** this repository into a Cloudera AI project (or sync from Git).
-2. **Register the runtime** built from this repo (`./scripts/docker/build-svd-image.sh`) as edition **SyntheticVideoDetector** (see `cai/runtime/METADATA.yaml`) in your Runtime Catalog.
+2. **Register the runtime** from Docker Hub (`latest` or `1.12`) or build locally (`./scripts/docker/build-svd-image.sh`) as edition **SyntheticVideoDetector** in your Runtime Catalog.
 3. **Run AMP tasks** (project metadata in `.project-metadata.yaml`):
    - Install Python Dependencies (`cai/amp/1_install/install_dependencies.py`)
    - Build UI (`cai/amp/6_demo_ui/build_demo.py`)
@@ -57,7 +69,8 @@ After deployment, open the **Bundled** or **Serverless** runtime URL → **Detec
 For local image build (optional, on a Linux/amd64 builder):
 
 ```bash
-./scripts/docker/build-svd-image.sh
+export SVD_RUNTIME_REGISTRY=kevintalbert   # optional: also tag kevintalbert/synthetic-video-detector:*
+./scripts/docker/build-svd-image.sh        # tags :1.12, :latest, and *-turing variants
 ```
 
 See [cai/README.md](cai/README.md) for AMP details, presets, and troubleshooting.
@@ -124,7 +137,7 @@ flowchart TB
 | `scripts/docker/` | Runtime image build script |
 | `Dockerfile` | Single image: Bundled (HF) + Serverless (client) Python extras |
 | `METADATA.yaml` | Cloudera blueprint website / catalog metadata (standard schema) |
-| `catalog-entry.yaml` | Legacy community catalog entry |
+| `catalog-entry.yaml` | Community blueprint catalog entry |
 | `.project-metadata.yaml` | CAI project AMP task definitions |
 | `pyproject.toml` | Python dependencies (`open`, `serverless` extras) |
 

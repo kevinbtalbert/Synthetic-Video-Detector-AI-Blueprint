@@ -29,11 +29,8 @@ cai/config/*_nim.log
 cai/nim_endpoints.json
 
 # Model caches (large)
-volumes/models/synthetic-video-detector/*
-!volumes/models/synthetic-video-detector/.gitkeep
-build/nim-model-cache/synthetic-video-detector/*
-!build/nim-model-cache/synthetic-video-detector/.gitkeep
-!build/nim-model-cache/README.md
+volumes/models/huggingface/
+
 # EC2 remote Docker build/push (local operator tooling — do not commit)
 scripts/aws/
 build/.ec2-secrets.env

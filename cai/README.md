@@ -1,6 +1,6 @@
 # Synthetic Video Detector on Cloudera AI Workbench
 
-CAI deployment overlay: **Bundled** Hugging Face GPU apps (new) and **Serverless** NVIDIA NVCF (1.6 path).
+CAI deployment overlay: **Bundled** Hugging Face GPU apps and **Serverless** NVIDIA NVCF.
 
 ## Architecture
 
@@ -17,7 +17,7 @@ Three CAI applications — not three copies of the same UI:
 The runtime image includes PyTorch, Transformers, and the blueprint open detector server (`src/svd/open_server.py`). At runtime the open app:
 
 1. Reads config from **CML application environment variables** (set by Launchpad at deploy time)
-2. Starts **`python -m src.svd.open_server`** on `SVD_OPEN_PORT` (default `8080`)
+2. Starts **`python -m src.svd.open_server`** on `SVD_OPEN_PORT` (default `8090`)
 3. Waits for `/health`, then wires `SVD_OPEN_SERVER=127.0.0.1:<port>` for the UI
 4. Serves the **Next.js UI** on `CDSW_APP_PORT`
 
@@ -62,12 +62,12 @@ Curated in `cai/config/open_model_catalog.json`:
 
 | Setting | Default |
 |---------|---------|
-| Serve port | `8080` |
+| Serve port | `8090` |
 | HF token | Optional for public models |
 
 **Bundled** does not call NVIDIA inference—the HF model runs in your GPU app.
 
-**Serverless** matches release **1.6**: NGC key, NVCF function ID, gRPC to `grpc.nvcf.nvidia.com`.
+**Serverless** uses NGC key, NVCF function ID, and gRPC to `grpc.nvcf.nvidia.com`.
 
 ## Troubleshooting
 
