@@ -1,7 +1,15 @@
-# Cloudera Blueprint: Synthetic Video Detector
+# Synthetic Video Detector
+
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Cloudera Blueprint](https://img.shields.io/badge/Cloudera-Blueprint-f96702.svg)](METADATA.yaml)
+[![NVIDIA NIM](https://img.shields.io/badge/NVIDIA-NIM-76b900.svg)](METADATA.yaml)
+[![Stars](https://img.shields.io/github/stars/kevinbtalbert/Synthetic-Video-Detector-AI-Blueprint?logo=github)](https://github.com/kevinbtalbert/Synthetic-Video-Detector-AI-Blueprint/stargazers)
+[![Watchers](https://img.shields.io/github/watchers/kevinbtalbert/Synthetic-Video-Detector-AI-Blueprint?logo=github)](https://github.com/kevinbtalbert/Synthetic-Video-Detector-AI-Blueprint/watchers)
+[![Forks](https://img.shields.io/github/forks/kevinbtalbert/Synthetic-Video-Detector-AI-Blueprint?logo=github)](https://github.com/kevinbtalbert/Synthetic-Video-Detector-AI-Blueprint/network/members)
+
 
 <p align="center">
-  <img src="assets/synthetic-video-detector.jpg" alt="Synthetic Video Detector" width="450" />
+  <img src="assets/synthetic-video-detector.jpg" alt="Synthetic Video Detector" width="600" />
 </p>
 
 
@@ -171,3 +179,16 @@ flowchart TB
 - [Cloudera AI documentation](https://docs.cloudera.com/) — applications, runtimes, and GPU scheduling
 - **Environment reference:** [.env.example](.env.example)
 - **Blueprint catalog fields:** [`METADATA.yaml`](METADATA.yaml) (see [Cloudera Blueprints Standard](https://github.com/cloudera/Cloudera-Blueprints-Standard) template)
+
+## Acknowledgments
+
+This blueprint is adapted from [NVIDIA's Synthetic Video Detector blueprint](https://build.nvidia.com/nvidia/synthetic-video-detector), reworked for deployment on Cloudera AI with Bundled (GPU/Hugging Face) and Serverless (NVCF) modes.
+
+## License
+
+This project is licensed under the [Apache License 2.0](LICENSE).
+
+## Disclaimer
+
+*This blueprint is intended for Proof-of-Concept and research use only. It is not designed for production deployment. Use in production environments is at the user's own risk. The authors and contributors accept no liability for operational impacts or damages.*
+
