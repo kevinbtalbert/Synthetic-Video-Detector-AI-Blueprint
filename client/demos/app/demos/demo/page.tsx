@@ -16,7 +16,7 @@ const SAMPLE_VIDEOS: SampleVideo[] = [
     id: "real",
     label: "Real video",
     description:
-      "Pexels stock clip (SDFVD v38, 5 s) — expected to classify as real.",
+      "Camera footage recorded in Seattle, USA (9 s) — expected to classify as real.",
     src: "/api/samples/real",
     filename: "real_sample_video.mp4",
   },
@@ -24,7 +24,7 @@ const SAMPLE_VIDEOS: SampleVideo[] = [
     id: "fake",
     label: "Synthetic video",
     description:
-      "Separate face-swap clip (SDFVD vs22, 5 s) — expected to classify as synthetic.",
+      "Unrelated clip generated with Gemini 3.6 Thinking (10 s) — expected to classify as synthetic.",
     src: "/api/samples/fake",
     filename: "fake_sample_video.mp4",
   },
@@ -47,7 +47,7 @@ export default function DemoPage() {
         <section className="rounded-xl border border-neutral-800 bg-neutral-950 p-6">
           <h2 className="mb-2 text-lg font-medium">Side-by-side samples</h2>
           <p className="mb-6 text-sm text-neutral-400">
-            Two unrelated ~5 s clips (different scenes)—run detection on each and compare expected
+            Two unrelated ~10 s clips (different scenes)—run detection on each and compare expected
             real vs synthetic outcomes on the timeline chart.
           </p>
 
@@ -62,25 +62,16 @@ export default function DemoPage() {
           </div>
 
           <p className="mt-4 text-xs text-neutral-500">
-            Samples from{" "}
+            Samples original to this blueprint, © 2026 Minseok (Mason) Jung, released under{" "}
             <a
-              href="https://huggingface.co/datasets/Hemgg/SDFVD-video-dataset"
+              href="https://www.apache.org/licenses/LICENSE-2.0"
               className="text-[var(--nvidia-green)] underline"
               target="_blank"
               rel="noreferrer"
             >
-              SDFVD
-            </a>{" "}
-            (real:{" "}
-            <a
-              href="https://www.pexels.com/license/"
-              className="text-[var(--nvidia-green)] underline"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Pexels
+              Apache-2.0
             </a>
-            ). See{" "}
+            . See{" "}
             <code className="text-neutral-400">assets/SAMPLE_VIDEOS_ATTRIBUTION.md</code>.
           </p>
 
