@@ -55,8 +55,6 @@ Prebuilt **SyntheticVideoDetector** edition **1.12** (linux/amd64):
 | Tag | Use |
 | --- | --- |
 | [`kevintalbert/synthetic-video-detector:latest`](https://hub.docker.com/r/kevintalbert/synthetic-video-detector) | Current release (points at **1.12**) |
-| `kevintalbert/synthetic-video-detector:latest-turing` | Same image; Turing GPU catalog label |
-| `kevintalbert/synthetic-video-detector:1.12` / `:1.12-turing` | Pinned version |
 
 Register the image in your Cloudera AI **Runtime Catalog** with edition **SyntheticVideoDetector** and short version **1.12** (`cai/runtime/METADATA.yaml`).
 
