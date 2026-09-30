@@ -11,20 +11,21 @@ import uvicorn
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 
-from src.svd.model_catalog import resolve_open_model_config
-from src.svd.open_inference import LoadedModel, load_open_model, score_video
+from src.svd.model_catalog import resolve_consensus_strategy, resolve_open_models
+from src.svd.open_inference import LoadedModel, load_open_models, score_video_with_consensus
+from src.svd.client import classification_threshold
 
 DEFAULT_PORT = 8090
 
-_loaded: LoadedModel | None = None
+_loaded: list[LoadedModel] = []
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     global _loaded
-    _loaded = load_open_model()
+    _loaded = load_open_models()
     yield
-    _loaded = None
+    _loaded = []
 
 
 app = FastAPI(title="SVD Open Weights Detector", lifespan=lifespan)
@@ -32,25 +33,38 @@ app = FastAPI(title="SVD Open Weights Detector", lifespan=lifespan)
 
 @app.get("/health")
 def health() -> dict[str, object]:
-    hf_id, kind, preset_id = resolve_open_model_config()
+    specs = resolve_open_models()
     return {
         "status": "ok",
-        "model": hf_id,
-        "kind": kind,
-        "preset_id": preset_id,
+        "model_count": len(_loaded),
+        "consensus": resolve_consensus_strategy(),
+        "models": [
+            {
+                "hf_model_id": m.hf_model_id,
+                "kind": m.kind,
+                "preset_id": m.preset_id,
+            }
+            for m in _loaded
+        ],
+        "configured": specs,
     }
 
 
 @app.post("/v1/detect")
 async def detect(file: UploadFile = File(...)) -> JSONResponse:
-    if _loaded is None:
-        return JSONResponse({"error": "Model not loaded"}, status_code=503)
+    if not _loaded:
+        return JSONResponse({"error": "Models not loaded"}, status_code=503)
     suffix = Path(file.filename or "upload.mp4").suffix or ".mp4"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(await file.read())
         tmp_path = Path(tmp.name)
     try:
-        result = score_video(tmp_path, _loaded)
+        threshold = classification_threshold()
+        result = score_video_with_consensus(
+            tmp_path,
+            _loaded,
+            threshold=threshold,
+        )
         return JSONResponse(result)
     finally:
         tmp_path.unlink(missing_ok=True)

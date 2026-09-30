@@ -54,6 +54,8 @@ def main() -> int:
         "clip_series": clip_series,
         "csv_data": result.csv_data,
     }
+    if result.consensus:
+        payload["consensus"] = result.consensus
     if args.progress_jsonl:
         print(json.dumps({"type": "result", **payload}), flush=True)
     else:

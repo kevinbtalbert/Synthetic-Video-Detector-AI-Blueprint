@@ -26,15 +26,15 @@ const BUNDLED_STEPS = [
   },
   {
     title: "Temporal analysis",
-    body: "VideoMAE windows or frame classifiers produce clip-aligned scores across the file.",
+    body: "Each selected Hugging Face model (VideoMAE or frame classifier) scores clips in-pod.",
   },
   {
     title: "Stream results",
     body: "The in-pod model server returns the same clip and aggregate result shape as Detect expects.",
   },
   {
-    title: "Aggregate verdict",
-    body: "Thresholded synthetic probability and timeline for editorial and integrity workflows.",
+    title: "Consensus verdict",
+    body: "Per-model scores combine via your chosen strategy (majority vote, unanimous, any, or mean) against the threshold.",
   },
 ];
 

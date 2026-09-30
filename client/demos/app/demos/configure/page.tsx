@@ -4,10 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import Header from "@/app/components/atoms/Header";
 import Card from "@/app/components/atoms/Card";
 import SecretInput from "@/app/components/atoms/SecretInput";
-import ModelPresetPicker from "@/app/components/atoms/ModelPresetPicker";
+import BundledModelSelector from "@/app/components/atoms/BundledModelSelector";
 import { NimStartupDetails } from "@/app/components/atoms/NimStartupProgress";
 import { useDeploymentStatus, type ServiceStatus } from "@/app/hooks/useDeploymentStatus";
-import type { OpenModelCatalog } from "@/app/lib/openModels";
+import {
+  type OpenConsensusStrategy,
+  type OpenModelCatalog,
+  type OpenModelEntry,
+  entriesFromPreset,
+  parseOpenModelEntries,
+  presetById,
+} from "@/app/lib/openModels";
 
 type DeployMode = "SERVERLESS" | "BUNDLED";
 
@@ -25,6 +32,8 @@ type BundledForm = {
   svd_open_model_kind: string;
   svd_hf_model_id: string;
   svd_open_port: string;
+  svd_open_consensus: OpenConsensusStrategy;
+  svd_open_models: OpenModelEntry[];
   detection_threshold: string;
 };
 
@@ -45,14 +54,64 @@ const defaultServerless: ServerlessForm = {
   detection_threshold: "0.05",
 };
 
+const defaultBundledModels: OpenModelEntry[] = [
+  {
+    hf_model_id: "eftt/VideoMae-ffc23-deepfake-detector",
+    kind: "videomae",
+    preset_id: "videomae-ffc23",
+    label: "VideoMAE FF++",
+  },
+];
+
 const defaultBundled: BundledForm = {
   hf_token: "",
   svd_open_model_preset: "videomae-ffc23",
   svd_open_model_kind: "videomae",
   svd_hf_model_id: "eftt/VideoMae-ffc23-deepfake-detector",
   svd_open_port: "8090",
+  svd_open_consensus: "majority",
+  svd_open_models: defaultBundledModels,
   detection_threshold: "0.05",
 };
+
+function bundledModelsFromConfig(
+  bd: Record<string, unknown>,
+  catalog: OpenModelCatalog | null,
+): OpenModelEntry[] {
+  const parsed = parseOpenModelEntries(bd.svd_open_models);
+  if (parsed.length) return parsed;
+  const presetId = String(bd.svd_open_model_preset || "videomae-ffc23");
+  const preset = catalog ? presetById(catalog, presetId) : undefined;
+  if (preset) return [entriesFromPreset(preset)];
+  const hf = String(bd.svd_hf_model_id || "").trim();
+  if (!hf) return defaultBundledModels;
+  return [
+    {
+      hf_model_id: hf,
+      kind: bd.svd_open_model_kind === "videomae" ? "videomae" : "image",
+      preset_id: presetId || undefined,
+    },
+  ];
+}
+
+function syncBundledLegacyFields(models: OpenModelEntry[]): Pick<
+  BundledForm,
+  "svd_hf_model_id" | "svd_open_model_kind" | "svd_open_model_preset"
+> {
+  const primary = models[0];
+  if (!primary) {
+    return {
+      svd_hf_model_id: defaultBundled.svd_hf_model_id,
+      svd_open_model_kind: defaultBundled.svd_open_model_kind,
+      svd_open_model_preset: defaultBundled.svd_open_model_preset,
+    };
+  }
+  return {
+    svd_hf_model_id: primary.hf_model_id,
+    svd_open_model_kind: primary.kind,
+    svd_open_model_preset: primary.preset_id || defaultBundled.svd_open_model_preset,
+  };
+}
 
 function appUrl(subdomain?: string): string | null {
   if (!subdomain) return null;
@@ -172,7 +231,8 @@ export default function LaunchpadPage() {
   const [serverlessForm, setServerlessForm] = useState(defaultServerless);
   const [bundledForm, setBundledForm] = useState(defaultBundled);
   const [dirty, setDirty] = useState({ serverless: false, bundled: false });
-  const hydrated = useRef(false);
+  const serverlessHydrated = useRef(false);
+  const bundledHydrated = useRef(false);
   const [busy, setBusy] = useState<DeployMode | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -186,10 +246,9 @@ export default function LaunchpadPage() {
   }, []);
 
   useEffect(() => {
-    if (!status?.config || hydrated.current) return;
-    hydrated.current = true;
+    if (!status?.config || serverlessHydrated.current) return;
+    serverlessHydrated.current = true;
     const sl = status.config.serverless as Record<string, unknown> | undefined;
-    const bd = (status.config.bundled || status.config.open) as Record<string, unknown> | undefined;
     if (sl) {
       setServerlessForm((prev) => ({
         ...prev,
@@ -199,17 +258,29 @@ export default function LaunchpadPage() {
         detection_threshold: String(sl.detection_threshold || prev.detection_threshold),
       }));
     }
-    if (bd) {
-      setBundledForm((prev) => ({
-        ...prev,
-        svd_open_model_preset: String(bd.svd_open_model_preset || prev.svd_open_model_preset),
-        svd_open_model_kind: String(bd.svd_open_model_kind || prev.svd_open_model_kind),
-        svd_hf_model_id: String(bd.svd_hf_model_id || prev.svd_hf_model_id),
-        svd_open_port: String(bd.svd_open_port || prev.svd_open_port),
-        detection_threshold: String(bd.detection_threshold || prev.detection_threshold),
-      }));
-    }
   }, [status]);
+
+  useEffect(() => {
+    if (!status?.config || !catalog || bundledHydrated.current) return;
+    bundledHydrated.current = true;
+    const bd = (status.config.bundled || status.config.open) as Record<string, unknown> | undefined;
+    if (!bd) return;
+    const models = bundledModelsFromConfig(bd, catalog);
+    const legacy = syncBundledLegacyFields(models);
+    const consensusRaw = String(bd.svd_open_consensus || "majority");
+    const consensus: OpenConsensusStrategy =
+      consensusRaw === "unanimous" || consensusRaw === "any" || consensusRaw === "mean"
+        ? consensusRaw
+        : "majority";
+    setBundledForm((prev) => ({
+      ...prev,
+      ...legacy,
+      svd_open_models: models,
+      svd_open_consensus: consensus,
+      svd_open_port: String(bd.svd_open_port || prev.svd_open_port),
+      detection_threshold: String(bd.detection_threshold || prev.detection_threshold),
+    }));
+  }, [status, catalog]);
 
   const post = async (mode: DeployMode, action: "save-config" | "validate" | "deploy") => {
     setBusy(mode);
@@ -354,7 +425,7 @@ export default function LaunchpadPage() {
         <DeploySection
           mode="BUNDLED"
           title="Deploy Bundled (GPU)"
-          description="Single GPU application with a curated Hugging Face model server and Detect/Demo UI in one pod."
+          description="Single GPU application with one or more Hugging Face models (consensus voting) and Detect/Demo UI in one pod."
           form={bundledForm}
           showNgcKey={false}
           onChange={(patch) => {
@@ -370,17 +441,18 @@ export default function LaunchpadPage() {
         >
           <div className="mt-2 space-y-6">
             {catalog ? (
-              <ModelPresetPicker
+              <BundledModelSelector
                 catalog={catalog}
-                selectedId={bundledForm.svd_open_model_preset}
+                models={bundledForm.svd_open_models}
+                consensus={bundledForm.svd_open_consensus}
                 disabled={busy !== null}
-                onSelect={(preset) => {
+                onChange={(models, consensus) => {
                   setDirty((d) => ({ ...d, bundled: true }));
                   setBundledForm((prev) => ({
                     ...prev,
-                    svd_open_model_preset: preset.id,
-                    svd_open_model_kind: preset.kind,
-                    svd_hf_model_id: preset.hf_model_id,
+                    ...syncBundledLegacyFields(models.length ? models : prev.svd_open_models),
+                    svd_open_models: models.length ? models : prev.svd_open_models,
+                    svd_open_consensus: consensus,
                   }));
                 }}
               />
@@ -402,17 +474,6 @@ export default function LaunchpadPage() {
                 Advanced settings
               </summary>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <label className="text-sm font-medium text-[var(--text-primary)] sm:col-span-2">
-                  Hugging Face model ID
-                  <input
-                    className={inputClass}
-                    value={bundledForm.svd_hf_model_id}
-                    onChange={(e) => {
-                      setDirty((d) => ({ ...d, bundled: true }));
-                      setBundledForm((prev) => ({ ...prev, svd_hf_model_id: e.target.value }));
-                    }}
-                  />
-                </label>
                 <label className="text-sm font-medium text-[var(--text-primary)]">
                   In-app model port
                   <input

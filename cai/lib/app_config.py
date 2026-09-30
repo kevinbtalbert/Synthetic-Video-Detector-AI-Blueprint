@@ -17,6 +17,9 @@ APP_ENVIRONMENT_ENV = CONFIG_DIR / "app_environment.env"
 
 SECRET_KEYS: frozenset[str] = frozenset({"ngc_api_key", "hf_token"})
 
+MAX_BUNDLED_OPEN_MODELS = 6
+VALID_OPEN_CONSENSUS = frozenset({"majority", "unanimous", "any", "mean"})
+
 _ENV_MAP: dict[str, str] = {
     "nim_deploy_mode": "NIM_DEPLOY_MODE",
     "ngc_api_key": "NGC_API_KEY",
@@ -25,6 +28,7 @@ _ENV_MAP: dict[str, str] = {
     "svd_open_model_preset": "SVD_OPEN_MODEL_PRESET",
     "svd_open_model_kind": "SVD_OPEN_MODEL_KIND",
     "svd_open_port": "SVD_OPEN_PORT",
+    "svd_open_consensus": "SVD_OPEN_CONSENSUS",
     "svd_nvidia_function_id": "SVD_NVIDIA_FUNCTION_ID",
     "nvidia_serverless_grpc_host": "NVIDIA_SERVERLESS_GRPC_HOST",
     "nvidia_serverless_grpc_port": "NVIDIA_SERVERLESS_GRPC_PORT",
@@ -45,6 +49,8 @@ class AppConfig:
     nvidia_serverless_grpc_host: str = "grpc.nvcf.nvidia.com"
     nvidia_serverless_grpc_port: str = "443"
     detection_threshold: str = "0.05"
+    svd_open_models: list[dict[str, Any]] = field(default_factory=list)
+    svd_open_consensus: str = "majority"
 
     @classmethod
     def from_environ(cls, *, mode: str | NIMDeployMode | None = None) -> AppConfig:
@@ -70,12 +76,14 @@ class AppConfig:
             ),
             nvidia_serverless_grpc_port=str(os.environ.get("NVIDIA_SERVERLESS_GRPC_PORT", "443")),
             detection_threshold=str(os.environ.get("SVD_DETECTION_THRESHOLD", "0.05")),
+            svd_open_models=_open_models_from_environ(),
+            svd_open_consensus=_normalize_consensus(str(os.environ.get("SVD_OPEN_CONSENSUS", "majority"))),
         )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AppConfig:
         mode = normalize_nim_deploy_mode(str(data.get("nim_deploy_mode", "BUNDLED"))).value
-        return cls(
+        config = cls(
             nim_deploy_mode=mode,
             ngc_api_key=str(data.get("ngc_api_key", "")),
             hf_token=str(data.get("hf_token", "")),
@@ -93,7 +101,10 @@ class AppConfig:
             ),
             nvidia_serverless_grpc_port=str(data.get("nvidia_serverless_grpc_port", "443")),
             detection_threshold=str(data.get("detection_threshold", "0.05")),
+            svd_open_models=_normalize_open_models(data),
+            svd_open_consensus=_normalize_consensus(str(data.get("svd_open_consensus", "majority"))),
         )
+        return _sync_primary_open_model_fields(config)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -108,6 +119,8 @@ class AppConfig:
             "svd_open_model_kind": self.svd_open_model_kind,
             "svd_open_port": self.svd_open_port,
             "detection_threshold": self.detection_threshold,
+            "svd_open_models": self.svd_open_models,
+            "svd_open_consensus": self.svd_open_consensus,
         }
 
     @classmethod
@@ -138,11 +151,14 @@ class AppConfig:
 
     def as_process_env(self) -> dict[str, str]:
         env: dict[str, str] = {}
+        payload = self.to_dict()
         for json_key, env_key in _ENV_MAP.items():
-            value = self.to_dict().get(json_key)
+            value = payload.get(json_key)
             if value is None or value == "":
                 continue
             env[env_key] = str(value)
+        if self.svd_open_models:
+            env["SVD_OPEN_MODELS_JSON"] = json.dumps(self.svd_open_models)
         return env
 
     def apply_to_environ(self) -> dict[str, str]:
@@ -177,8 +193,29 @@ class AppConfig:
                 "Serverless deployment uses the NVIDIA Cloud Functions API — evaluation use only."
             )
         else:
-            if not self.svd_hf_model_id.strip():
-                errors.append("Hugging Face model ID is required for bundled deployment.")
+            models = self.svd_open_models or _legacy_single_open_model(self)
+            if not models:
+                errors.append("Select at least one Hugging Face model for bundled deployment.")
+            elif len(models) > MAX_BUNDLED_OPEN_MODELS:
+                errors.append(
+                    f"At most {MAX_BUNDLED_OPEN_MODELS} bundled models are supported per deployment."
+                )
+            for idx, spec in enumerate(models, start=1):
+                if not str(spec.get("hf_model_id") or "").strip():
+                    errors.append(f"Bundled model #{idx} is missing a Hugging Face model ID.")
+                kind = str(spec.get("kind") or "").lower()
+                if kind not in {"image", "videomae"}:
+                    errors.append(
+                        f"Bundled model #{idx} must use kind 'image' or 'videomae'."
+                    )
+            if self.svd_open_consensus not in VALID_OPEN_CONSENSUS:
+                errors.append(
+                    "Invalid consensus strategy. Use majority, unanimous, any, or mean."
+                )
+            if len(models) > 1:
+                warnings.append(
+                    f"Bundled runtime loads {len(models)} models; consensus uses '{self.svd_open_consensus}'."
+                )
             warnings.append(
                 "First start downloads the selected Hugging Face weights into the project cache; allow several minutes on cold boot."
             )
@@ -244,6 +281,90 @@ class LaunchpadConfig:
             "serverless": self.serverless.secrets_set(),
             "bundled": self.bundled.secrets_set(),
         }
+
+
+def _normalize_consensus(raw: str) -> str:
+    token = raw.strip().lower()
+    return token if token in VALID_OPEN_CONSENSUS else "majority"
+
+
+def _normalize_open_models(data: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = data.get("svd_open_models")
+    if isinstance(raw, list) and raw:
+        out: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            hf_id = str(item.get("hf_model_id") or "").strip()
+            if not hf_id or hf_id in seen:
+                continue
+            seen.add(hf_id)
+            kind = str(item.get("kind") or "image").lower()
+            if kind not in {"image", "videomae"}:
+                kind = "image"
+            entry: dict[str, Any] = {"hf_model_id": hf_id, "kind": kind}
+            preset_id = str(item.get("preset_id") or "").strip()
+            if preset_id:
+                entry["preset_id"] = preset_id
+            label = str(item.get("label") or "").strip()
+            if label:
+                entry["label"] = label
+            out.append(entry)
+        if out:
+            return out
+    legacy = _legacy_single_open_model_from_dict(data)
+    return [legacy] if legacy else []
+
+
+def _legacy_single_open_model_from_dict(data: dict[str, Any]) -> dict[str, Any] | None:
+    hf_id = str(data.get("svd_hf_model_id") or "").strip()
+    if not hf_id:
+        return None
+    kind = str(data.get("svd_open_model_kind") or "image").lower()
+    if kind not in {"image", "videomae"}:
+        kind = "image"
+    entry: dict[str, Any] = {"hf_model_id": hf_id, "kind": kind}
+    preset_id = str(data.get("svd_open_model_preset") or "").strip()
+    if preset_id:
+        entry["preset_id"] = preset_id
+    return entry
+
+
+def _legacy_single_open_model(config: AppConfig) -> list[dict[str, Any]]:
+    if config.svd_open_models:
+        return config.svd_open_models
+    row = _legacy_single_open_model_from_dict(config.to_dict())
+    return [row] if row else []
+
+
+def _sync_primary_open_model_fields(config: AppConfig) -> AppConfig:
+    if not config.svd_open_models:
+        return config
+    primary = config.svd_open_models[0]
+    hf_id = str(primary.get("hf_model_id") or "").strip()
+    if hf_id:
+        config.svd_hf_model_id = hf_id
+    kind = str(primary.get("kind") or "").strip()
+    if kind in {"image", "videomae"}:
+        config.svd_open_model_kind = kind
+    preset_id = str(primary.get("preset_id") or "").strip()
+    if preset_id:
+        config.svd_open_model_preset = preset_id
+    return config
+
+
+def _open_models_from_environ() -> list[dict[str, Any]]:
+    raw = os.environ.get("SVD_OPEN_MODELS_JSON", "").strip()
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    return _normalize_open_models({"svd_open_models": data})
 
 
 def validate_merged_config(

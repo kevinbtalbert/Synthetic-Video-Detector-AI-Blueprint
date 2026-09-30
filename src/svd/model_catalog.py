@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 ModelKind = Literal["image", "videomae"]
+ConsensusStrategy = Literal["majority", "unanimous", "any", "mean"]
 
 _CATALOG_PATH = Path(__file__).resolve().parents[2] / "cai" / "config" / "open_model_catalog.json"
 
@@ -52,8 +53,42 @@ def preset_for_hf_model(hf_model_id: str) -> dict[str, Any] | None:
     return None
 
 
-def resolve_open_model_config() -> tuple[str, ModelKind, str | None]:
-    """Return (hf_model_id, kind, preset_id)."""
+def _parse_models_json(raw: str) -> list[dict[str, Any]]:
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        hf_id = str(item.get("hf_model_id") or "").strip()
+        if not hf_id:
+            continue
+        kind = str(item.get("kind") or "image").strip().lower()
+        if kind not in {"image", "videomae"}:
+            kind = "image"
+        entry: dict[str, Any] = {"hf_model_id": hf_id, "kind": kind}
+        preset_id = str(item.get("preset_id") or "").strip()
+        if preset_id:
+            entry["preset_id"] = preset_id
+        label = str(item.get("label") or "").strip()
+        if label:
+            entry["label"] = label
+        out.append(entry)
+    return out
+
+
+def resolve_open_models() -> list[dict[str, Any]]:
+    """Return ordered Hugging Face model specs for bundled (open-weights) inference."""
+    env_json = os.environ.get("SVD_OPEN_MODELS_JSON", "").strip()
+    if env_json:
+        parsed = _parse_models_json(env_json)
+        if parsed:
+            return parsed
+
     preset_id = os.environ.get("SVD_OPEN_MODEL_PRESET", "").strip() or None
     hf_id = os.environ.get("SVD_HF_MODEL_ID", "").strip()
     kind_raw = os.environ.get("SVD_OPEN_MODEL_KIND", "").strip().lower()
@@ -80,4 +115,24 @@ def resolve_open_model_config() -> tuple[str, ModelKind, str | None]:
         matched = preset_for_hf_model(hf_id)
         kind_raw = str(matched.get("kind") if matched else "image")
 
-    return hf_id, kind_raw, preset_id  # type: ignore[return-value]
+    spec: dict[str, Any] = {"hf_model_id": hf_id, "kind": kind_raw}
+    if preset_id:
+        spec["preset_id"] = preset_id
+    return [spec]
+
+
+def resolve_consensus_strategy() -> ConsensusStrategy:
+    raw = os.environ.get("SVD_OPEN_CONSENSUS", "majority").strip().lower()
+    if raw in {"majority", "unanimous", "any", "mean"}:
+        return raw  # type: ignore[return-value]
+    return "majority"
+
+
+def resolve_open_model_config() -> tuple[str, ModelKind, str | None]:
+    """Return (hf_model_id, kind, preset_id) for the primary bundled model."""
+    specs = resolve_open_models()
+    primary = specs[0]
+    hf_id = str(primary.get("hf_model_id") or "")
+    kind_raw = str(primary.get("kind") or "image")
+    preset_id = primary.get("preset_id")
+    return hf_id, kind_raw, str(preset_id) if preset_id else None  # type: ignore[return-value]

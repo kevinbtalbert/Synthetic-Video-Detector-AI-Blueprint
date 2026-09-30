@@ -20,9 +20,13 @@ export default function DetectionResultSummary({ result }: { result: DetectionRe
               {synthetic ? "Likely synthetic video" : "Likely real video"}
             </h3>
             <p className="text-sm text-neutral-400">
-              {synthetic
-                ? "Aggregate score is at or above the detection threshold—treat as potential AI-generated content."
-                : "Aggregate score is below the threshold—consistent with authentic footage."}
+              {result.consensus && result.consensus.model_count > 1
+                ? synthetic
+                  ? `Consensus (${result.consensus.strategy}): ${result.consensus.votes_fake}/${result.consensus.model_count} models flagged synthetic.`
+                  : `Consensus (${result.consensus.strategy}): ${result.consensus.votes_real}/${result.consensus.model_count} models lean real.`
+                : synthetic
+                  ? "Aggregate score is at or above the detection threshold—treat as potential AI-generated content."
+                  : "Aggregate score is below the threshold—consistent with authentic footage."}
             </p>
           </div>
         </div>
@@ -56,6 +60,24 @@ export default function DetectionResultSummary({ result }: { result: DetectionRe
           </dd>
         </div>
       </dl>
+      {result.consensus && result.consensus.models.length > 1 ? (
+        <div className="mt-4 border-t border-neutral-800 pt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">Per-model scores</p>
+          <ul className="mt-2 space-y-1.5 text-xs">
+            {result.consensus.models.map((row) => (
+              <li
+                key={row.hf_model_id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-black/30 px-2 py-1.5"
+              >
+                <span className="truncate font-mono text-neutral-400">{row.hf_model_id}</span>
+                <span className={row.is_synthetic ? "text-red-400" : "text-[var(--nvidia-green)]"}>
+                  {(row.probability * 100).toFixed(1)}% · {row.is_synthetic ? "synthetic" : "real"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DetectPhase } from "@/app/components/atoms/DetectionProgress";
-import type { ClipPoint, DetectionResult } from "@/app/lib/detectionTypes";
+import type { ClipPoint, DetectionConsensus, DetectionResult } from "@/app/lib/detectionTypes";
 import { parseClipSeriesFromCsv } from "@/app/lib/detectionTypes";
 
 export type { DetectionResult };
@@ -24,6 +24,7 @@ type StreamEvent = {
   clip_series?: ClipPoint[];
   csv_data?: string;
   logit_final?: number;
+  consensus?: DetectionConsensus;
 };
 
 function buildResult(event: StreamEvent): DetectionResult {
@@ -40,6 +41,7 @@ function buildResult(event: StreamEvent): DetectionResult {
     threshold: Number(event.threshold ?? 0.05),
     clip_series: clipSeries,
     csv_data: event.csv_data,
+    consensus: event.consensus,
   };
 }
 

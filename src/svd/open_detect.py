@@ -72,6 +72,18 @@ def detect_video_open(
     logit = float(payload.get("logit") or 0.0)
     if not probability and logit:
         probability = _expit(logit)
+    threshold = classification_threshold()
+    consensus = payload.get("consensus")
+    if isinstance(consensus, dict) and "is_synthetic" in payload:
+        is_synthetic = bool(payload.get("is_synthetic"))
+    elif isinstance(consensus, dict):
+        votes_fake = int(consensus.get("votes_fake") or 0)
+        votes_real = int(consensus.get("votes_real") or 0)
+        is_synthetic = votes_fake > votes_real or (
+            votes_fake == votes_real and probability >= threshold
+        )
+    else:
+        is_synthetic = probability >= threshold
     score = probability
     return DetectionResult(
         probability=score,
@@ -79,6 +91,7 @@ def detect_video_open(
         total_clips=int(payload.get("total_clips") or len(clip_results)),
         csv_data=str(payload.get("csv_data") or ""),
         clip_results=clip_results,
-        is_synthetic=score >= classification_threshold(),
+        is_synthetic=is_synthetic,
         synthetic_score_percent=round(score * 100, 1),
+        consensus=consensus if isinstance(consensus, dict) else None,
     )

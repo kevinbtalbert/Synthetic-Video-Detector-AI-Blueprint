@@ -10,6 +10,8 @@ export type PersistedConfig = {
   svd_open_model_preset?: string;
   svd_open_model_kind?: string;
   svd_open_port?: string;
+  svd_open_consensus?: string;
+  svd_open_models?: unknown;
   detection_threshold?: string;
   ngc_api_key?: string;
   hf_token?: string;
@@ -24,6 +26,7 @@ const ENV_MAP: Record<string, string> = {
   svd_open_model_preset: "SVD_OPEN_MODEL_PRESET",
   svd_open_model_kind: "SVD_OPEN_MODEL_KIND",
   svd_open_port: "SVD_OPEN_PORT",
+  svd_open_consensus: "SVD_OPEN_CONSENSUS",
   detection_threshold: "SVD_DETECTION_THRESHOLD",
   ngc_api_key: "NGC_API_KEY",
   hf_token: "HF_TOKEN",
@@ -89,6 +92,9 @@ function applyDeploymentJson(env: NodeJS.ProcessEnv): void {
       const value = data[jsonKey as keyof PersistedConfig];
       if (value) env[envKey] = String(value);
     }
+    if (Array.isArray(data.svd_open_models) && data.svd_open_models.length) {
+      env.SVD_OPEN_MODELS_JSON = JSON.stringify(data.svd_open_models);
+    }
   } catch {
     /* ignore */
   }
@@ -107,6 +113,8 @@ const BAKED_RUNTIME_KEYS = [
   "NVIDIA_SERVERLESS_GRPC_HOST",
   "NVIDIA_SERVERLESS_GRPC_PORT",
   "SVD_DETECTION_THRESHOLD",
+  "SVD_OPEN_CONSENSUS",
+  "SVD_OPEN_MODELS_JSON",
   "SVD_APP_ROLE",
 ] as const;
 

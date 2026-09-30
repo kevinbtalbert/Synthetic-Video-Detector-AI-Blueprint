@@ -4,6 +4,24 @@ export type ClipPoint = {
   logit?: number;
 };
 
+export type ModelConsensusRow = {
+  hf_model_id: string;
+  kind?: string;
+  preset_id?: string | null;
+  probability: number;
+  is_synthetic: boolean;
+  total_clips?: number;
+};
+
+export type DetectionConsensus = {
+  strategy: string;
+  threshold: number;
+  votes_fake: number;
+  votes_real: number;
+  model_count: number;
+  models: ModelConsensusRow[];
+};
+
 export type DetectionResult = {
   probability: number;
   logit?: number;
@@ -13,6 +31,7 @@ export type DetectionResult = {
   threshold: number;
   clip_series: ClipPoint[];
   csv_data?: string;
+  consensus?: DetectionConsensus;
 };
 
 export function parseClipSeriesFromCsv(csv: string): ClipPoint[] {
